@@ -1,4 +1,4 @@
-import type { EvidenceRef } from './contracts.js';
+import type { EvidenceRef } from './contracts.ts';
 
 export type MemoryKind = 'working' | 'episodic' | 'semantic' | 'decision';
 

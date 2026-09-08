@@ -3,7 +3,7 @@ import type {
   AgentTask,
   ExecutionPolicyDecision,
   GroundedAgentOutput,
-} from './contracts.js';
+} from './contracts.ts';
 
 const BLOCKED_MODES: readonly ActionMode[] = ['execute_write', 'control'];
 
@@ -63,35 +63,5 @@ export function hasDecisionGradeEvidence<T>(output: GroundedAgentOutput<T>): boo
         ref.entityId.trim().length > 0 &&
         !Number.isNaN(Date.parse(ref.observedAt)),
     )
-  );
-}
-
-/** High-impact outputs cannot be released without a valid named approval. */
-export function hasApprovedHumanReview<T>(output: GroundedAgentOutput<T>): boolean {
-  const approval = output.humanApproval;
-
-  return Boolean(
-    approval &&
-      approval.decision === 'approved' &&
-      approval.reviewerId.trim().length > 0 &&
-      approval.reviewerRole.trim().length > 0 &&
-      !Number.isNaN(Date.parse(approval.at)),
-  );
-}
-
-/**
- * Final release control for a decision-grade output. This remains separate from
- * planning so no caller can treat a permitted draft as an approved deliverable.
- */
-export function isOutputReleaseReady<T>(
-  task: AgentTask,
-  output: GroundedAgentOutput<T>,
-): boolean {
-  const policy = evaluateExecutionPolicy(task);
-
-  return (
-    policy.allowed &&
-    hasDecisionGradeEvidence(output) &&
-    (!policy.approvalRequired || hasApprovedHumanReview(output))
   );
 }

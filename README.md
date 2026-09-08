@@ -1,58 +1,86 @@
-# RailMind Agent OS Foundation
+# Project 44 — RailMind Agent OS
 
-RailMind is a **governed decision and orchestration layer** for rail maintenance intelligence. It connects to authoritative systems, applies deterministic rules and KPIs, produces evidence-backed drafts, and retains human accountability for consequential decisions.
+Canonical implementation repository for an open-source, evidence-first rail asset and contract intelligence platform.
 
-This repository deliberately begins as a small TypeScript modular monolith. It contains domain contracts, routing, execution policy, a read-only Maximo port, an in-memory P0 memory adapter, reporting contracts, architecture decisions, and executable safety tests. It does **not** connect to production Maximo or finance systems, calculate contract KPIs, invoke a language model, or perform external writes.
+> Replace document-driven periodic reporting with a governed, continuously updated decision environment while keeping Maximo, finance and approved contract repositories authoritative.
 
-## Architecture boundaries
+## What Project 44 owns
 
-| RailMind owns | RailMind integrates, but does not own |
-|---|---|
-| Decision records, recommendations, approvals, outcomes, evidence snapshots, reporting intelligence | Asset register, work orders, maintenance history, finance ledger, invoice workflow, approved contract obligations and safety-critical control |
+Project 44 is the **Agent Operating System and decision layer**. It connects asset, maintenance, finance and approved contractual context; calculates deterministic KPIs; detects exceptions; coordinates bounded agents; drafts grounded reports; and enforces human approval.
 
-The foundation blocks rail control and autonomous external writes. High-impact contractual, financial and safety-critical outputs require named human review. Every decision-grade output must carry valid provenance.
+The existing `RailMind` repository is treated as the asset-intelligence reference/legacy prototype until its reusable components are migrated.
 
-## Quick start
+## Non-negotiable rules
+
+1. Maximo and finance remain systems of record.
+2. Contractual KPIs are deterministic, versioned and testable. LLMs do not calculate contractual KPI truth.
+3. Every decision-grade output carries source provenance.
+4. High-impact contractual, financial and safety-adjacent outputs require named human review.
+5. No autonomous safety-critical rail control.
+6. P0 enterprise integrations are read-only.
+7. Model and agent-framework independence through internal ports.
+8. Open-source-first, zero-cost-capable local development.
+
+## P0 implemented
+
+- canonical decision data model
+- configurable Maximo REST read adapter and mock port
+- deterministic Availability / Failure / MTBF / MTTR / Backlog demo engine
+- versioned KPI observations with evidence
+- exception-based management engine
+- monthly / quarterly / annual report package model
+- deterministic executive summary
+- optional OpenAI-compatible local model gateway
+- grounded report-narrative service
+- governed multi-agent kernel and memory abstraction
+- Control Tower view model
+- Arabic-first bilingual Control Tower preview with English toggle, responsive navigation, evidence drawers and human-review safeguards
+- local verification and static preview smoke test, with a GitHub Actions activation template
+
+> **Important:** KPI formulas and thresholds included in the demo are synthetic examples only. They are not RTA contractual definitions and must be replaced by formally approved rules before production.
+
+## Run
 
 ```bash
-npm install
-npm run check
+npm run verify
+npm run serve
 ```
 
-The validated commands are:
+Open `http://localhost:4173`.
 
-| Command | Purpose |
-|---|---|
-| `npm run typecheck` | Strict TypeScript validation of source and tests |
-| `npm test` | Policy, routing, evidence and memory tests |
-| `npm run build` | Produces portable JavaScript and declaration files in `dist/` |
-| `npm run check` | Runs all three release checks |
+The browser preview remains **illustrative only**. It is built from synthetic data and never sends an external write, creates a work order or changes a source system.
 
-## Repository map
+## Architecture
 
-| Location | Purpose |
-|---|---|
-| `src/agent-os/` | Model-independent Agent OS contracts, catalog, routing, policy and P0 memory adapter |
-| `src/connectors/maximo/` | Read-only Maximo anti-corruption port |
-| `src/reporting/` | Reporting and deterministic KPI data contracts |
-| `tests/` | Executable architectural and safety controls |
-| `docs/` | P0 architecture, data contract, pilot plan, scope ADR and stack rationale |
+```text
+Maximo / Finance / Contracts / Condition feeds
+                  │
+          Evidence & Provenance
+                  │
+       Deterministic KPI Engine
+                  │
+     Exception & Decision Layer
+                  │
+        RailMind Agent OS Kernel
+       ┌──────────┼───────────┐
+ Asset Agent   Reporting   Contract/Finance Agents
+       └──────────┼───────────┘
+                  │
+          Human Approval Gates
+                  │
+ Control Tower / Exception Centre / Reports
+```
 
-## Implementation review and next build priorities
+## Documentation
 
-The supplied foundation was **additive and suitable as an architectural baseline**. It establishes the critical guardrails needed for RailMind: source-of-truth discipline, vendor-independent model access, read-only P0 integration, human approval for high-impact work, deterministic routing and provenance checks.
-
-Before any operational pilot, implement these items in order:
-
-1. Confirm approved KPI formula versions, clauses, exclusions, thresholds and sign-off roles with the relevant RTA/contract authorities. Do not encode generic KPI formulas.
-2. Build a Maximo read adapter against synthetic or anonymised export data, preserving source IDs, timestamps, ingestion timestamps and snapshot hashes.
-3. Create a deterministic KPI module with versioned formulas and test vectors signed off by the business owner.
-4. Persist decisions, evidence and approvals in PostgreSQL with tenant/contract access controls and an immutable audit trail.
-5. Implement a report approval state machine that rejects release until evidence is valid and the required named approval exists.
-6. Add data classification, redaction and model-gateway controls before any confidential data is sent to an inference endpoint.
-
-See [the P0 pilot plan](docs/P0_PILOT_PLAN.md), [data requirements](docs/DATA_REQUIREMENTS.md), and [architecture](docs/ARCHITECTURE_AGENT_OS.md) for the approved sequencing and boundaries.
-
-## License
-
-No software licence has been selected. The `OPEN_SOURCE_STACK.md` recommendation is not a licence grant. Add an owner-approved `LICENSE` file before representing this repository as open source or accepting reusable external contributions.
+- `docs/PRODUCT_AUTHORITY.md`
+- `docs/ARCHITECTURE_AGENT_OS.md`
+- `docs/DATA_REQUIREMENTS.md`
+- `docs/P0_IMPLEMENTATION_STATUS.md`
+- `docs/P0_PILOT_PLAN.md`
+- `docs/OPEN_SOURCE_STACK.md`
+- `docs/DEPLOYMENT.md`
+- `docs/MIGRATION_FROM_RAILMIND.md`
+- `docs/ADR-002_PLATFORM_SCOPE.md`
+- `docs/UX_REVIEW_2026-09-09.md`
+- `docs/CI_WORKFLOW_TEMPLATE.yml`

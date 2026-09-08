@@ -2,8 +2,8 @@ import type {
   AgentDefinition,
   AgentExecutionPlan,
   AgentTask,
-} from './contracts.js';
-import { evaluateExecutionPolicy } from './policy.js';
+} from './contracts.ts';
+import { evaluateExecutionPolicy } from './policy.ts';
 
 export type PlanningResult =
   | { ok: true; plan: AgentExecutionPlan }

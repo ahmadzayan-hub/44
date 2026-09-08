@@ -1,4 +1,4 @@
-import type { EvidenceRef } from '../agent-os/contracts.js';
+import type { EvidenceRef } from '../agent-os/contracts.ts';
 
 export type ReportCadence = 'monthly' | 'quarterly' | 'annual';
 

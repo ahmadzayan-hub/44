@@ -1,4 +1,4 @@
-import type { AgentDefinition } from './contracts.js';
+import type { AgentDefinition } from './contracts.ts';
 
 export const AGENT_CATALOG: readonly AgentDefinition[] = [
   {
