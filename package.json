@@ -1,0 +1,33 @@
+{
+  "name": "railmind-agent-os-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Governed Agent OS foundation for RailMind maintenance decision intelligence.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc -p tsconfig.build.json",
+    "smoke:package": "node scripts/package-smoke.mjs",
+    "check": "npm run typecheck && npm run test && npm run build && npm run smoke:package"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
