@@ -1,9 +1,10 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const port = Number(process.env.PORT ?? 4173);
-const root = process.cwd();
+const root = dirname(fileURLToPath(import.meta.url));
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
 
 createServer((req, res) => {
@@ -13,7 +14,7 @@ createServer((req, res) => {
     return;
   }
   const raw = decodeURIComponent((req.url ?? '/').split('?')[0]);
-  const safe = normalize(raw).replace(/^(\.\.(\/|\\|$))+/, '');
+  const safe = normalize(raw).replace(/^[/\\]+/, '').replace(/^(\.\.(\/|\\|$))+/, '');
   let file = join(root, safe === '/' ? 'index.html' : safe);
   if (!file.startsWith(root)) file = join(root, 'index.html');
   if (!existsSync(file) || statSync(file).isDirectory()) file = join(root, 'index.html');
