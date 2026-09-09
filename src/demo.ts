@@ -7,6 +7,8 @@ import { buildReportPackage, deterministicExecutiveSummary } from './reporting/g
 const periodStart = '2026-08-01T00:00:00Z';
 const periodEnd = '2026-08-31T23:59:59Z';
 
+export const DEMO_PERIOD = { start: periodStart, end: periodEnd } as const;
+
 export const DEMO_WORK_ORDERS: readonly MaximoWorkOrderRecord[] = [
   { workOrderId: 'WO-1001', assetId: 'ATC-ZC-01', workType: 'CM', status: 'COMP', reportedAt: '2026-08-03T08:00:00Z', actualStartAt: '2026-08-03T08:20:00Z', completedAt: '2026-08-03T10:20:00Z', downtimeMinutes: 120, failureCode: 'COMM' },
   { workOrderId: 'WO-1002', assetId: 'ATC-ZC-02', workType: 'CM', status: 'COMP', reportedAt: '2026-08-10T10:00:00Z', actualStartAt: '2026-08-10T10:10:00Z', completedAt: '2026-08-10T13:10:00Z', downtimeMinutes: 180, failureCode: 'HW' },

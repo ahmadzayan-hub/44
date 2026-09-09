@@ -36,7 +36,11 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - Control Tower view model
 - Arabic-first bilingual Control Tower preview with English toggle, responsive navigation, evidence drawers and human-review safeguards
 - deterministic schedule-adjusted expenditure-pace distribution model with P25 / P50 / P75 portfolio planning scenarios
-- local verification and static preview smoke test, with a GitHub Actions activation template
+- report approval state machine (draft, under review, approved, locked) with evidence gates and named accountability
+- hash-chained, append-only audit log for report transitions, approvals and agent runs
+- release-readiness policy: no high-impact output is release-ready without decision-grade evidence and a named approved review
+- engine-generated browser data pack: every number in the preview is produced by the deterministic engine and verified against it
+- local verification, packaged build smoke test and static preview smoke test, with a GitHub Actions activation template
 
 > **Important:** KPI formulas and thresholds included in the demo are synthetic examples only. They are not RTA contractual definitions and must be replaced by formally approved rules before production. The portfolio forecast is exploratory decision support, not a committed budget, cash forecast or contractual entitlement.
 
@@ -50,6 +54,17 @@ npm run serve
 Open `http://localhost:4173`.
 
 The browser preview remains **illustrative only**. It is built from synthetic data and never sends an external write, creates a work order or changes a source system.
+
+### How the preview gets its numbers
+
+The preview has no bundler and no runtime dependency, so it cannot execute the TypeScript engine directly. Instead `src/web/demo-pack.ts` projects the engine's outputs (KPI observations, exceptions, report status, approval gate, asset roll-ups and a period-to-date replay timeline) into `web/data/demo-pack.js`.
+
+```bash
+npm run build:web-data   # regenerate web/data/demo-pack.js from the engine
+npm run check:web-data   # fails when the committed file drifts from the engine (part of verify)
+```
+
+The browser layer owns bilingual labels and layout only. If a number on screen is wrong, fix the engine or the synthetic data in `src/demo.ts`, regenerate, and commit the result.
 
 ## Replit
 

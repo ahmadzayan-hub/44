@@ -1,4 +1,4 @@
-import type { EvidenceRef } from '../agent-os/contracts.ts';
+import type { EvidenceRef, HumanApproval } from '../agent-os/contracts.ts';
 
 export type ReportCadence = 'monthly' | 'quarterly' | 'annual';
 
@@ -40,5 +40,13 @@ export interface ReportPackage {
   exceptions: readonly ReportException[];
   /** AI may draft narrative only after KPI observations have been approved. */
   narrativeDraft?: string;
-  status: 'draft' | 'under_review' | 'approved' | 'locked';
+  status: ReportStatus;
+  /** Set when the package is submitted for named review. */
+  reviewRequestedAt?: string;
+  /** Named human decision recorded at approval or rejection. */
+  approval?: HumanApproval;
+  /** Set when the approved package is locked for the period. */
+  lockedAt?: string;
 }
+
+export type ReportStatus = 'draft' | 'under_review' | 'approved' | 'locked';

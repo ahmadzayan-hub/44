@@ -2,6 +2,8 @@
 
 **Review date:** 9 September 2026
 **Scope:** `RailMind-agent-os-foundation.patch` supplied for repository integration
+**Status update (2026-09-09, later the same day):** `hasApprovedHumanReview` and `isOutputReleaseReady` are now implemented in `src/agent-os/policy.ts` with tests. The test runner is `node:test`, not Vitest. The audit-persistence and report-approval gaps listed below are addressed in-memory by `src/audit/log.ts` and `src/reporting/approval.ts`; durable persistence, identity and data classification remain open.
+
 **Repository state at review:** The selected GitHub repository was empty. The supplied patch was therefore integrated as the initial repository baseline and completed with the minimum TypeScript build, test, package and CI configuration required to make it executable.
 
 ## Executive assessment

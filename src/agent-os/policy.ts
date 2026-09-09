@@ -65,3 +65,30 @@ export function hasDecisionGradeEvidence<T>(output: GroundedAgentOutput<T>): boo
     )
   );
 }
+
+/** A named, approved human review with a valid timestamp. */
+export function hasApprovedHumanReview<T>(output: GroundedAgentOutput<T>): boolean {
+  const review = output.humanApproval;
+  if (!review) return false;
+  return (
+    review.decision === 'approved' &&
+    review.reviewerId.trim().length > 0 &&
+    review.reviewerRole.trim().length > 0 &&
+    !Number.isNaN(Date.parse(review.at))
+  );
+}
+
+/**
+ * Release readiness combines provenance and governance. A permitted draft is
+ * not release-ready when the policy demands approval and no named approved
+ * review exists, or when the output carries no decision-grade evidence.
+ */
+export function isOutputReleaseReady<T>(
+  output: GroundedAgentOutput<T>,
+  policy: ExecutionPolicyDecision,
+): boolean {
+  if (!policy.allowed) return false;
+  if (!hasDecisionGradeEvidence(output)) return false;
+  if (policy.approvalRequired && !hasApprovedHumanReview(output)) return false;
+  return true;
+}

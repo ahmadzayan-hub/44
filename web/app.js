@@ -1,80 +1,280 @@
+import { DEMO_PACK } from './data/demo-pack.js';
+
+/*
+ * RailMind Control Tower preview.
+ *
+ * Every number rendered here comes from DEMO_PACK, which is generated from the
+ * deterministic engine in src/ (see src/web/demo-pack.ts). This file owns only
+ * presentation: bilingual labels, layout, and local interaction state. It never
+ * calculates a KPI, invents a value, or writes to an external system.
+ */
+
+const pack = DEMO_PACK;
+
 const state = {
-  language: 'ar', compact: false,
-  telemetry: { active: true, ticks: 0, timer: null, eventId: 0, lastSignalAt: null, lastSignalLabel: null },
+  language: 'ar',
+  compact: false,
+  telemetry: { active: true, timer: null, index: pack.timeline.length - 1, eventId: 0, lastSignalAt: null },
   gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true }, selected: null, eventLabel: null },
-  kpis: [
-    { value: '98.522', base: 98.522, unit: '%', precision: 3, status: 'high', ar: 'التوافر التشغيلي', en: 'Operational availability', arTrend: 'أقل من النطاق التجريبي', enTrend: 'Below demo target', target: '≥ 99.5%' },
-    { value: '04', base: 4, unit: '', precision: 0, status: 'good', ar: 'حالات العطل', en: 'Failure count', arTrend: 'ضمن الحد التجريبي', enTrend: 'At demo target', target: '≤ 4' },
-    { value: '183.5', base: 183.5, unit: 'h', precision: 1, status: 'good', ar: 'متوسط الزمن بين الأعطال', en: 'Mean time between failures', arTrend: 'ضمن النطاق', enTrend: 'Within target', target: '≥ 120h' },
-    { value: '2.75', base: 2.75, unit: 'h', precision: 2, status: 'critical', ar: 'متوسط زمن الإصلاح', en: 'Mean time to repair', arTrend: 'الخروق المتتالية: 3', enTrend: 'Third breach cycle', target: '≤ 2h' },
-    { value: '03', base: 3, unit: 'WO', precision: 0, status: 'good', ar: 'الأعمال المتراكمة', en: 'Maintenance backlog', arTrend: 'ضمن الحد التجريبي', enTrend: 'Within demo limit', target: '≤ 5' },
-  ],
-  exceptions: [
-    { id: 'DEC-042', severity: 'critical', ar: 'خروج متكرر لمؤشر MTTR', en: 'Persistent MTTR breach', arDetail: '2.75 ساعة مقابل حد تجريبي ≤ 2 ساعة. يفترض العرض التجريبي وجود خرقين سابقين للتصعيد.', enDetail: '2.75h against a synthetic demo threshold of ≤2h. The demonstration assumes two prior breaches for escalation.', arDecision: 'يلزم مراجعة مالك صيانة أو عقد مُسمى.', enDecision: 'Named maintenance or contract owner review is required.', arOwner: 'حوكمة الصيانة', enOwner: 'Maintenance governance', arDue: 'مراجعة خلال 4 ساعات', enDue: 'Review within 4 hours', evidence: 'Maximo Demo · WO-1001–WO-1004', arFresh: '4 سجلات مصدر · تحديث قبل 12 دقيقة', enFresh: '4 source records · refreshed 12 min ago' },
-    { id: 'DEC-043', severity: 'high', ar: 'التوافر أقل من المستهدف التجريبي', en: 'Availability below demo target', arDetail: '98.522% مقابل حد تجريبي ≥ 99.5%. يجب التحقق من تصنيف وقت التوقف قبل اعتماد أي إجراء.', enDetail: '98.522% against a synthetic demo threshold of ≥99.5%. Validate downtime classification before approving any action.', arDecision: 'تحقق من تصنيف التوقف والإجراء التصحيحي.', enDecision: 'Validate downtime classification and corrective action.', arOwner: 'فريق الأداء', enOwner: 'Performance team', arDue: 'قرار قبل نهاية اليوم', enDue: 'Decision before close of day', evidence: 'Maximo Demo · KPI availability v1.0', arFresh: '4 سجلات مصدر · حالة جودة موثقة', enFresh: '4 source records · quality verified' },
-    { id: 'DEC-044', severity: 'watch', ar: 'حجم أعمال الصيانة الوقائية المفتوحة', en: 'Open preventive maintenance workload', arDetail: 'أمرا عمل للصيانة الوقائية في حالة WAPPR ضمن العينة الاصطناعية.', enDetail: 'Two preventive maintenance work orders remain WAPPR in the synthetic sample.', arDecision: 'أكد الجدولة وتواريخ الاستحقاق.', enDecision: 'Confirm scheduling and due dates.', arOwner: 'تخطيط الصيانة', enOwner: 'Maintenance planning', arDue: 'متابعة خلال يوم عمل', enDue: 'Follow up within one business day', evidence: 'Maximo Demo · WO-1005–WO-1006', arFresh: 'سجلان مصدر · تحديث قبل 12 دقيقة', enFresh: '2 source records · refreshed 12 min ago' },
-  ],
-  assets: [
-    { id: 'ATC-ZC-01', arClass: 'إشارات / تحكم آلي بالقطارات', enClass: 'Signalling / ATC', arLocation: 'خط المترو', enLocation: 'Metro line', open: 1, arSignal: 'متابعة', enSignal: 'Watch' },
-    { id: 'ATC-ZC-02', arClass: 'إشارات / تحكم آلي بالقطارات', enClass: 'Signalling / ATC', arLocation: 'خط المترو', enLocation: 'Metro line', open: 0, arSignal: 'تكرار عالٍ للعطل', enSignal: 'High repeat failure' },
-    { id: 'TRAM-APS-03', arClass: 'تغذية كهربائية', enClass: 'Traction power', arLocation: 'الترام', enLocation: 'Tram', open: 2, arSignal: 'توقف حرج', enSignal: 'Critical downtime' },
-  ],
-  agents: [
-    { ar: 'وكيل جودة البيانات', en: 'Data Quality Agent', arState: 'جاهز', enState: 'Ready', arDetail: 'يتحقق من الاكتمال والطوابع الزمنية وجودة المصدر', enDetail: 'Validates completeness, timestamps, and source quality' },
-    { ar: 'وكيل ذكاء الأصول', en: 'Asset Intelligence Agent', arState: 'جاهز', enState: 'Ready', arDetail: 'يفسر صحة الأصل ومحركات الأعطال', enDetail: 'Explains asset health and failure drivers' },
-    { ar: 'وكيل مؤشرات الصيانة', en: 'Maintenance KPI Agent', arState: 'حتمي', enState: 'Deterministic', arDetail: 'يحسب الصيغ المعتمدة خارج نموذج اللغة', enDetail: 'Computes approved formulas outside the language model' },
-    { ar: 'وكيل سياق العقد', en: 'Contract Context Agent', arState: 'جاهز', enState: 'Ready', arDetail: 'يربط أدلة KPI بالسياق التعاقدي المعتمد', enDetail: 'Maps KPI evidence to approved contract context' },
-    { ar: 'وكيل التقارير', en: 'Reporting Agent', arState: 'بوابة بشرية', enState: 'Human gate', arDetail: 'يصوغ السرد بعد اعتماد KPI', enDetail: 'Drafts narrative after KPI approval' },
-  ],
+};
+
+/* ---------- Presentation metadata (labels only, no numbers) ---------- */
+
+const kpiLabels = {
+  availability: { ar: 'التوافر التشغيلي', en: 'Operational availability', precision: 3, icon: '◒' },
+  failures: { ar: 'حالات العطل', en: 'Failure count', precision: 0, icon: '◌' },
+  mtbf: { ar: 'متوسط الزمن بين الأعطال', en: 'Mean time between failures', precision: 2, icon: '◌' },
+  mttr: { ar: 'متوسط زمن الإصلاح', en: 'Mean time to repair', precision: 2, icon: '△' },
+  backlog: { ar: 'الأعمال المتراكمة', en: 'Maintenance backlog', precision: 0, icon: '◌' },
+};
+const unitLabels = { '%': { ar: '%', en: '%' }, count: { ar: '', en: '' }, hours: { ar: 'س', en: 'h' }, 'work orders': { ar: 'أمر', en: 'WO' } };
+const assetLabels = {
+  'ATC-ZC-01': { arClass: 'إشارات / تحكم آلي بالقطارات', enClass: 'Signalling / ATC', arLocation: 'خط المترو', enLocation: 'Metro line' },
+  'ATC-ZC-02': { arClass: 'إشارات / تحكم آلي بالقطارات', enClass: 'Signalling / ATC', arLocation: 'خط المترو', enLocation: 'Metro line' },
+  'TRAM-APS-03': { arClass: 'تغذية كهربائية', enClass: 'Traction power', arLocation: 'الترام', enLocation: 'Tram' },
+};
+const agentLabels = {
+  'data-quality': { ar: 'وكيل جودة البيانات', arDetail: 'يتحقق من الاكتمال والطوابع الزمنية وجودة المصدر', enDetail: 'Validates completeness, timestamps, and source quality' },
+  'asset-intelligence': { ar: 'وكيل ذكاء الأصول', arDetail: 'يفسر صحة الأصل ومحركات الأعطال', enDetail: 'Explains asset health and failure drivers' },
+  'maintenance-kpi': { ar: 'وكيل مؤشرات الصيانة', arDetail: 'يشرح نتائج الصيغ الحتمية المحسوبة خارج نموذج اللغة', enDetail: 'Explains deterministic results computed outside the language model' },
+  reporting: { ar: 'وكيل التقارير', arDetail: 'يصوغ السرد بعد اعتماد KPI', enDetail: 'Drafts narrative after KPI approval' },
+  'executive-briefing': { ar: 'وكيل الموجز التنفيذي', arDetail: 'يحوّل الاستثناءات المعتمدة إلى قرارات مطلوبة', enDetail: 'Turns approved exceptions into decisions required' },
+  'contract-context': { ar: 'وكيل سياق العقد', arDetail: 'يسترجع البنود والحدود وقواعد الأدلة المعتمدة', enDetail: 'Retrieves approved clauses, thresholds and evidence rules' },
+  'finance-context': { ar: 'وكيل سياق المالية', arDetail: 'يسترجع حالة الفواتير وسير العمل', enDetail: 'Retrieves invoice and workflow status' },
+};
+/* Demo routing defaults by severity. These are presentation defaults, not contract rules. */
+const routing = {
+  critical: { arOwner: 'حوكمة الصيانة', enOwner: 'Maintenance governance', arDue: 'مراجعة خلال 4 ساعات', enDue: 'Review within 4 hours' },
+  high: { arOwner: 'فريق الأداء', enOwner: 'Performance team', arDue: 'قرار قبل نهاية اليوم', enDue: 'Decision before close of day' },
+  watch: { arOwner: 'تخطيط الصيانة', enOwner: 'Maintenance planning', arDue: 'متابعة خلال يوم عمل', enDue: 'Follow up within one business day' },
 };
 
 const en = {
-  pilot:'Safe pilot mode', navControl:'Control Tower', navNetwork:'Network GIS', navExceptions:'Exception Centre', navAssets:'Asset Intelligence', navContract:'Contract Performance', navReports:'Reports Workspace', navAgents:'Agent Workspace', navPortfolio:'Portfolio Intelligence', portfolioKicker:'SANITISED PORTFOLIO ANALYTICS', portfolioTitle:'Portfolio intelligence', portfolioText:'Explore aggregated budget, expenditure and award-status insight. No source-system connection or external write exists.', portfolioBoundaryTitle:'Aggregated read-only data', portfolioBoundaryCopy:'Generalised data · no organisation, vendor, or initiative identifiers', guardrailTitle:'Decision safeguards', guardrailNav:'Read, analyse, and draft only', userName:'Ahmed Zaian', userRole:'Decision owner', search:'Search or open command', compact:'Compact view', eyebrow:'CONTROL TOWER · INTELLIGENT OPERATIONS', greeting:'Good morning, Ahmed', tagline:'Evidence-led operations, not impressions', synthetic:'Safe illustrative data for testing', updated:'Last updated', executiveView:'EXECUTIVE VIEW', heroTitle:'Today’s picture is clear.', heroText:'Move from exception to a clear decision with a complete trail for source, reviewer, and approval.', refresh:'Refresh view', scopeLabel:'Current scope', scopeRed:'Pilot scope · Red Line', scopeTram:'Pilot scope · Dubai Tram', scopeDepot:'Pilot scope · Al Qusais Depot', periodLabel:'Analysis window', periodMonth:'This month', period30:'Last 30 days', periodLocked:'Locked report period', boundaryTitle:'P0 boundary', boundaryText:'Read, analyse, and draft only. No operational control or autonomous external write.', priorityDecisions:'Priority decisions', priorityText:'Rank exceptions by consequence and urgency, then open evidence before any decision is approved.', viewAll:'View all', signalSummary:'Signal summary', signalText:'The priority now: protect decision clarity before increasing automation scale.', signalSource:'Based on a traceable illustrative pack', openBrief:'Open decision brief', openBriefText:'Evidence, assumptions, and approval status', performancePulse:'Performance pulse', performanceText:'The illustrative trajectory is stable, with one evidence-linked watch point.', availability:'Availability', watchPoint:'Watch point', week1:'Week 1', week2:'Week 2', week3:'Week 3', today:'Today', evidenceChain:'Evidence chain', evidenceText:'Trace a conclusion from narrative to metric, source record, and timestamp.', sourceRecord:'Source record', governedMetric:'Governed metric', pmBacklog:'PM backlog · v1.0', recommendationDraft:'Recommendation draft', awaitingReview:'Awaiting human review', safeWorkspace:'SAFEGUARDED WORKSPACE', agentWorkspace:'Agent workspace', agentText:'Request analysis, then inspect assumptions and evidence before using any draft.', waiting:'Waiting for your request', suggestedQuestions:'Suggested questions', qAttention:'What decision is required today?', qEvidence:'Check evidence completeness', qBreaches:'Show KPI breaches', qReport:'Is the monthly report ready?', agentPlaceholder:'Example: Summarise PM backlog drivers in the Red Line scope', runAnalysis:'Run safeguarded analysis', agentFooter:'No high-impact decision is released before named human approval.', priorityQueue:'PRIORITY QUEUE', exceptionCentre:'Exception Centre', maximoLinked:'MAXIMO-LINKED', assetIntelligence:'Asset Intelligence', sharedTruth:'SHARED CONTRACT TRUTH', contractPerformance:'Contract Performance', approvedData:'GENERATED FROM APPROVED DATA', reportingCentre:'Reporting Centre', governedAgents:'GOVERNED MULTI-AGENT SYSTEM', askRailmind:'ASK RAILMIND', decisionQuery:'Decision query', queryInitial:'Choose a decision question. Demo answers are deterministic and grounded in synthetic data.', decisionPack:'Decision pack', telemetryTitle:'Simulated live telemetry stream', telemetrySource:'Local simulation · no external connection', telemetryPaused:'Simulation paused', telemetryLast:'Last signal', telemetryReady:'Ready to start', telemetryPausedAt:'Paused', telemetryStop:'Pause stream', telemetryStart:'Resume stream', telemetryReset:'Simulation reset', telemetryEventPrefix:'TLM'
+  pilot:'Safe pilot mode', navControl:'Control Tower', navNetwork:'Network GIS', navExceptions:'Exception Centre', navAssets:'Asset Intelligence', navContract:'Contract Performance', navReports:'Reports Workspace', navAgents:'Agent Workspace', navPortfolio:'Portfolio Intelligence', portfolioKicker:'SANITISED PORTFOLIO ANALYTICS', portfolioTitle:'Portfolio intelligence', portfolioText:'Explore aggregated budget, expenditure and award-status insight. No source-system connection or external write exists.', portfolioBoundaryTitle:'Aggregated read-only data', portfolioBoundaryCopy:'Generalised data · no organisation, vendor, or initiative identifiers', guardrailTitle:'Decision safeguards', guardrailNav:'Read, analyse, and draft only', userName:'Ahmed Zaian', userRole:'Decision owner', search:'Search or open command', compact:'Compact view', eyebrow:'CONTROL TOWER · INTELLIGENT OPERATIONS', greeting:'Good morning, Ahmed', tagline:'Evidence-led operations, not impressions', synthetic:'Safe illustrative data for testing', updated:'Last updated', executiveView:'EXECUTIVE VIEW', heroTitle:'Today’s picture is clear.', heroText:'Move from exception to a clear decision with a complete trail for source, reviewer, and approval.', refresh:'Refresh view', scopeLabel:'Current scope', scopeRed:'Pilot scope · Red Line', scopeTram:'Pilot scope · Dubai Tram', scopeDepot:'Pilot scope · Al Qusais Depot', periodLabel:'Analysis window', periodMonth:'This month', period30:'Last 30 days', periodLocked:'Locked report period', boundaryTitle:'P0 boundary', boundaryText:'Read, analyse, and draft only. No operational control or autonomous external write.', priorityDecisions:'Priority decisions', priorityText:'Rank exceptions by consequence and urgency, then open evidence before any decision is approved.', viewAll:'View all', signalSummary:'Signal summary', signalText:'The priority now: protect decision clarity before increasing automation scale.', signalSource:'Based on a traceable illustrative pack', openBrief:'Open decision brief', openBriefText:'Evidence, assumptions, and approval status', performancePulse:'Performance pulse', performanceText:'The illustrative trajectory is stable, with one evidence-linked watch point.', availability:'Availability', watchPoint:'Watch point', week1:'Week 1', week2:'Week 2', week3:'Week 3', today:'Today', evidenceChain:'Evidence chain', evidenceText:'Trace a conclusion from narrative to metric, source record, and timestamp.', sourceRecord:'Source record', governedMetric:'Governed metric', pmBacklog:'Maintenance backlog', recommendationDraft:'Recommendation draft', awaitingReview:'Awaiting human review', safeWorkspace:'SAFEGUARDED WORKSPACE', agentWorkspace:'Agent workspace', agentText:'Request analysis, then inspect assumptions and evidence before using any draft.', waiting:'Waiting for your request', suggestedQuestions:'Suggested questions', qAttention:'What decision is required today?', qEvidence:'Check evidence completeness', qBreaches:'Show KPI breaches', qReport:'Is the monthly report ready?', agentPlaceholder:'Example: Summarise PM backlog drivers in the Red Line scope', runAnalysis:'Run safeguarded analysis', agentFooter:'No high-impact decision is released before named human approval.', priorityQueue:'PRIORITY QUEUE', exceptionCentre:'Exception Centre', maximoLinked:'MAXIMO-LINKED', assetIntelligence:'Asset Intelligence', sharedTruth:'SHARED CONTRACT TRUTH', contractPerformance:'Contract Performance', approvedData:'GENERATED FROM APPROVED DATA', reportingCentre:'Reporting Centre', governedAgents:'GOVERNED MULTI-AGENT SYSTEM', askRailmind:'ASK RAILMIND', decisionQuery:'Decision query', queryInitial:'Choose a decision question. Demo answers are deterministic and grounded in synthetic data.', decisionPack:'Decision pack',
 };
-const ar = { details:'التفاصيل', action:'مطلوب إجراء', source:'المصدر', observed:'وقت الرصد', quality:'حالة الجودة', verified:'تم التحقق', recommendation:'التوصية المقترحة', governance:'حاجز الحوكمة', requestReview:'إرسال للمراجعة البشرية', reviewReady:'تم تجهيز الطلب للمراجعة البشرية فقط', reviewNote:'يتطلب الاعتماد اسم المراجع والدور والتوقيت قبل اعتبار المخرج جاهزاً.', noWrite:'لا ينفذ هذا العرض أي أمر عمل أو رسالة أو تغيير في نظام مصدر.', analysisReady:'مسودة جاهزة للمراجعة', working:'يجري تجهيز المسودة...', attention:'تتطلب ثلاثة عناصر الانتباه: خرق MTTR المتكرر، والتوافر الأدنى من الهدف التجريبي، وأمرا صيانة وقائية مفتوحان. كل النتائج مرتبطة بسجلات Maximo اصطناعية.', evidence:'اكتمال الأدلة في هذا العرض التجريبي موثق لكل KPI وسجل مصدر. لا يتعامل العرض مع بيانات تشغيلية أو تعاقدية حية.', breaches:'يوجد خرقان لمؤشرات تجريبية: التوافر 98.522% مقابل ≥99.5%، وMTTR عند 2.75 ساعة مقابل ≤2 ساعة.', report:'لا. التقرير الشهري ما زال في حالة مسودة، ويلزم اعتماد بشري مُسمى بسبب الاستثناء الحرج.', guardrail:'واجهة P0 للقراءة والتحليل والصياغة فقط. لا توجد كتابة خارجية تلقائية.', refreshed:'تم تحديث العرض التجريبي', compactOn:'تم تفعيل العرض المبسط', compactOff:'تم إلغاء العرض المبسط', notify:'لا توجد تنبيهات غير مقروءة في العرض التجريبي.', severity:{critical:'حرج',high:'مرتفع',watch:'متابعة',good:'ضمن النطاق'}, contractHeading:'الأداء الشهري · أغسطس 2026', contractText:'يوضح هذا النموذج الأولي طبقة ذكاء مشتركة بين المالك والمقاول. يجب استبدال بنود العقد والصيغ والحدود بتعريفات معتمدة رسمياً قبل الإنتاج.', reportMonthly:'تقرير الأداء الشهري', reportQuarterly:'المراجعة التنفيذية الفصلية', reportAnnual:'تقرير الأصول والعقد السنوي', reportDraft:'مسودة · مراجعة بشرية مطلوبة', reportNotGenerated:'لم يتم التوليد', reportSummary:'ملخص تنفيذي حتمي', reportBody:'ثلاثة من خمسة مؤشرات تجريبية ضمن المستهدف. يوجد خرقان للمؤشرات وثلاثة استثناءات إدارية مفتوحة. هذا الملخص حتمي ولا يحتوي على حقائق مولدة من نموذج لغوي.', telemetryTitle:'تدفق قياسات لحظي تجريبي', telemetrySource:'محاكاة محلية · لا يوجد اتصال خارجي', telemetryPaused:'محاكاة متوقفة مؤقتاً', telemetryLast:'آخر إشارة', telemetryReady:'جاهز للبدء', telemetryPausedAt:'متوقف مؤقتاً', telemetryStop:'إيقاف التدفق', telemetryStart:'استئناف التدفق', telemetryReset:'تمت إعادة ضبط المحاكاة', telemetryEventPrefix:'TLM' };
-const enExtra = { details:'Details', action:'Action required', source:'Source', observed:'Observed at', quality:'Quality state', verified:'Verified', recommendation:'Proposed recommendation', governance:'Governance guardrail', requestReview:'Request human review', reviewReady:'Request prepared for human review only', reviewNote:'A reviewer name, role, and timestamp are required before an output is considered ready.', noWrite:'This demonstration never creates a work order, message, or source-system change.', analysisReady:'Draft ready for review', working:'Preparing your draft...', attention:'Three items require attention: persistent MTTR breach, availability below the demo target, and two open preventive maintenance work orders. Every result is linked to synthetic Maximo records.', evidence:'Evidence completeness is documented for every illustrative KPI and source record. This interface does not handle live operational or contractual data.', breaches:'There are two demo KPI breaches: availability at 98.522% versus ≥99.5%, and MTTR at 2.75h versus ≤2h.', report:'No. The monthly report remains a draft and needs named human approval because a critical exception is open.', guardrail:'P0 interface for read, analyse, and draft only. No autonomous external write exists.', refreshed:'Illustrative view refreshed', compactOn:'Compact view enabled', compactOff:'Compact view disabled', notify:'No unread notifications in the illustrative view.', severity:{critical:'Critical',high:'High',watch:'Watch',good:'Within range'}, contractHeading:'Monthly Performance · August 2026', contractText:'This P0 demonstrates a shared intelligence layer for the owner and contractor. Contract clauses, formulas, and thresholds must be replaced with formally approved definitions before production.', reportMonthly:'Monthly Performance Report', reportQuarterly:'Quarterly Executive Review', reportAnnual:'Annual Asset & Contract Report', reportDraft:'Draft · human review required', reportNotGenerated:'Not generated', reportSummary:'Deterministic executive summary', reportBody:'Three of five demo KPIs are within target. Two KPI breaches and three management exceptions remain open. This summary is deterministic and contains no language-model generated facts.' };
+const ar = {
+  details:'التفاصيل', action:'مطلوب إجراء', source:'المصدر', observed:'وقت الرصد', quality:'حالة الجودة', verified:'تم التحقق', recommendation:'التوصية المقترحة', governance:'حاجز الحوكمة', requestReview:'إرسال للمراجعة البشرية', reviewReady:'تم تجهيز الطلب للمراجعة البشرية فقط', reviewNote:'يتطلب الاعتماد اسم المراجع والدور والتوقيت قبل اعتبار المخرج جاهزاً.', noWrite:'لا ينفذ هذا العرض أي أمر عمل أو رسالة أو تغيير في نظام مصدر.', analysisReady:'مسودة جاهزة للمراجعة', working:'يجري تجهيز المسودة...', guardrail:'واجهة P0 للقراءة والتحليل والصياغة فقط. لا توجد كتابة خارجية تلقائية.', refreshed:'تم تحديث العرض التجريبي', compactOn:'تم تفعيل العرض المبسط', compactOff:'تم إلغاء العرض المبسط', notify:'لا توجد تنبيهات غير مقروءة في العرض التجريبي.', severity:{critical:'حرج',high:'مرتفع',watch:'متابعة',good:'ضمن النطاق'}, target:'المستهدف', within:'ضمن الحد التجريبي', below:'أقل من المستهدف التجريبي', above:'أعلى من الحد التجريبي', watchTrend:'نقطة متابعة', formula:'إصدار الصيغة', evidenceCount:'سجلات مصدر', asOf:'كما في', replay:'إعادة تشغيل الفترة', engineLabel:'محسوب بمحرك KPI الحتمي', exceptionId:'معرّف الاستثناء', kpiWithin:'المؤشر ضمن المستهدف ولا يوجد استثناء مفتوح.', reportMonthly:'تقرير الأداء الشهري', reportQuarterly:'المراجعة التنفيذية الفصلية', reportAnnual:'تقرير الأصول والعقد السنوي', reportNotGenerated:'لم يتم التوليد', reportSummary:'ملخص تنفيذي حتمي', approvalGate:'بوابة الاعتماد', nextStep:'الانتقال التالي المسموح', blockers:'موانع', noBlockers:'لا توجد موانع، الحزمة جاهزة للإرسال إلى مراجعة مُسمّاة.', status:{draft:'مسودة · مراجعة بشرية مطلوبة',under_review:'قيد المراجعة',approved:'معتمد',locked:'مغلق'}, transition:{submit_for_review:'إرسال للمراجعة',approve:'اعتماد',reject:'رفض',lock:'إغلاق الفترة'}, telemetryTitle:'إعادة تشغيل حتمية لأحداث الفترة', telemetrySource:'محاكاة محلية · إعادة حساب المؤشرات عند كل سجل', telemetryPaused:'إعادة التشغيل متوقفة مؤقتاً', telemetryLast:'آخر إشارة', telemetryReady:'جاهز للبدء', telemetryPausedAt:'متوقف مؤقتاً', telemetryStop:'إيقاف التدفق', telemetryStart:'استئناف التدفق', telemetryReset:'تمت إعادة الضبط إلى إغلاق الفترة', telemetryEventPrefix:'TLM', periodClose:'إغلاق الفترة', deterministicModes:'حتمي', modelModes:'قد يستخدم نموذجاً', humanGate:'بوابة بشرية', workOrdersSeen:'أوامر عمل مرصودة',
+};
+const enExtra = {
+  details:'Details', action:'Action required', source:'Source', observed:'Observed at', quality:'Quality state', verified:'Verified', recommendation:'Proposed recommendation', governance:'Governance guardrail', requestReview:'Request human review', reviewReady:'Request prepared for human review only', reviewNote:'A reviewer name, role, and timestamp are required before an output is considered ready.', noWrite:'This demonstration never creates a work order, message, or source-system change.', analysisReady:'Draft ready for review', working:'Preparing your draft...', guardrail:'P0 interface for read, analyse, and draft only. No autonomous external write exists.', refreshed:'Illustrative view refreshed', compactOn:'Compact view enabled', compactOff:'Compact view disabled', notify:'No unread notifications in the illustrative view.', severity:{critical:'Critical',high:'High',watch:'Watch',good:'Within range'}, target:'Target', within:'Within demo target', below:'Below demo target', above:'Above demo limit', watchTrend:'Watch point', formula:'Formula version', evidenceCount:'source records', asOf:'As of', replay:'Period replay', engineLabel:'Computed by the deterministic KPI engine', exceptionId:'Exception id', kpiWithin:'KPI is within target and no exception is open.', reportMonthly:'Monthly Performance Report', reportQuarterly:'Quarterly Executive Review', reportAnnual:'Annual Asset & Contract Report', reportNotGenerated:'Not generated', reportSummary:'Deterministic executive summary', approvalGate:'Approval gate', nextStep:'Next allowed transition', blockers:'Blockers', noBlockers:'No blockers. The package is ready for submission to a named review.', status:{draft:'Draft · human review required',under_review:'Under review',approved:'Approved',locked:'Locked'}, transition:{submit_for_review:'Submit for review',approve:'Approve',reject:'Reject',lock:'Lock period'}, telemetryTitle:'Deterministic replay of period events', telemetrySource:'Local simulation · KPIs recomputed at each record', telemetryPaused:'Replay paused', telemetryLast:'Last signal', telemetryReady:'Ready to start', telemetryPausedAt:'Paused', telemetryStop:'Pause stream', telemetryStart:'Resume stream', telemetryReset:'Reset to period close', telemetryEventPrefix:'TLM', periodClose:'Period close', deterministicModes:'Deterministic', modelModes:'May use a model', humanGate:'Human gate', workOrdersSeen:'work orders observed',
+};
 
-const $ = (s) => document.querySelector(s); const $$ = (s) => [...document.querySelectorAll(s)];
-const L = () => state.language === 'ar' ? ar : {...en, ...enExtra};
-const tx = (key) => L()[key] || key;
-const local = (item, suffix = '') => item[`${state.language}${suffix}`] ?? item[state.language];
+/* ---------- Helpers ---------- */
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const isAr = () => state.language === 'ar';
+const L = () => (isAr() ? ar : { ...en, ...enExtra });
+const tx = (key) => L()[key] ?? key;
+const pick = (obj, key) => obj[`${state.language}${key}`] ?? obj[state.language] ?? '';
 const status = (value) => `<span class="status-pill status-pill--${value}"><i>●</i>${tx('severity')[value]}</span>`;
+const unit = (u) => (unitLabels[u] ?? { ar: u, en: u })[state.language];
+const locale = () => (isAr() ? 'ar-AE' : 'en-GB');
+const fmtDate = (iso) => new Date(iso).toLocaleString(locale(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+const fmtValue = (id, value) => { const p = kpiLabels[id]?.precision ?? 2; return p === 0 ? String(Math.round(value)).padStart(2, '0') : Number(value).toFixed(p); };
+const directionSign = (d) => (d === 'higher_is_better' ? '≥' : d === 'lower_is_better' ? '≤' : '=');
+const targetText = (k) => (k.threshold === null ? '' : `${directionSign(k.direction)} ${k.threshold}${unit(k.unit)}`);
+const cardStatus = (k) => (k.status === 'within_target' ? 'good' : k.status === 'watch' ? 'watch' : k.severity === 'critical' ? 'critical' : 'high');
+const kpiName = (id) => kpiLabels[id]?.[state.language] ?? id;
+const exceptionCode = (exception) => `EXC-${exception.kpiId.toUpperCase()}`;
+const evidenceRange = (evidence) => { if (!evidence.length) return '—'; const ids = evidence.map((e) => e.entityId); return ids.length > 2 ? `${ids[0]}…${ids[ids.length - 1]} (${ids.length})` : ids.join(', '); };
+const sourceLabel = (evidence) => { const src = evidence[0]?.sourceSystem ?? 'railmind'; return `${src === 'maximo' ? 'Maximo Demo' : src} · ${evidenceRange(evidence)}`; };
+const criticalCount = () => pack.controlTower.criticalExceptions;
+const openWorkOrders = () => pack.workOrders.filter((wo) => !['COMP', 'CLOSE', 'CAN'].includes(wo.status.toUpperCase())).length;
 
-function renderKpis(){
-  $('#kpi-grid').innerHTML = state.kpis.map((k, index) => `<article class="metric-card metric-card--${k.status}" data-metric="${index}"><div class="metric-top"><span class="metric-icon">${k.status==='critical'?'△':k.status==='good'?'◌':'◒'}</span><span class="metric-trend"><i></i>${local(k,'Trend')}</span></div><strong><span class="metric-value">${k.value}</span><small>${k.unit}</small></strong><b>${local(k)}</b><small class="metric-secondary">${state.language==='ar'?'المستهدف':'Target'} ${k.target}</small><span class="metric-rule"></span><span class="metric-live" aria-hidden="true"></span></article>`).join('');
+function trendText(k) {
+  if (k.status === 'within_target') return tx('within');
+  if (k.status === 'watch') return tx('watchTrend');
+  return k.direction === 'higher_is_better' ? tx('below') : tx('above');
 }
-function renderDecisions(){ $('#decision-list').innerHTML = state.exceptions.map((x,i) => `<article class="decision-item decision-item--${x.severity}"><span class="decision-rail"></span><span class="decision-index">0${i+1}</span><div class="decision-content"><div class="decision-title"><div><b>${local(x)}</b><small>${state.language==='ar'?x.en:x.ar}</small></div>${status(x.severity)}</div><p>${local(x,'Detail')}</p><div class="decision-meta"><span>⌁ ${local(x,'Owner')}</span><span>◷ ${local(x,'Due')}</span><span>${x.id}</span></div></div><button class="decision-action" data-decision="${x.id}" type="button">${state.language==='ar'?'اعرض الأدلة':'Open evidence'} <i>‹</i></button></article>`).join(''); $$('[data-decision]').forEach((b)=>b.addEventListener('click',()=>openDecision(b.dataset.decision))); }
-function renderExceptionTable(){ $('#exception-count').textContent = `${state.exceptions.length} ${state.language==='ar'?'مفتوحة':'open'}`; const h=state.language==='ar'?['الحالة','الاستثناء','الأدلة','الإجراء المطلوب']:['Severity','Exception','Evidence','Decision required']; $('#exception-table').innerHTML=`<div class="data-table"><div class="table-row table-head">${h.map(v=>`<span>${v}</span>`).join('')}</div>${state.exceptions.map(x=>`<div class="table-row"><span>${status(x.severity)}</span><span><b>${local(x)}</b><small>${local(x,'Detail')}</small></span><span>${x.evidence}</span><span>${local(x,'Decision')}</span></div>`).join('')}</div>`; }
-function renderAssets(){ const h=state.language==='ar'?['الأصل','الفئة','الموقع','أوامر مفتوحة','الإشارة']:['Asset','Class','Location','Open WOs','Signal']; $('#asset-table').innerHTML=`<div class="data-table asset-table"><div class="table-row table-head">${h.map(v=>`<span>${v}</span>`).join('')}</div>${state.assets.map(a=>`<div class="table-row"><span><b dir="ltr">${a.id}</b></span><span>${local(a,'Class')}</span><span>${local(a,'Location')}</span><span>${a.open}</span><span>${local(a,'Signal')}</span></div>`).join('')}</div>`; }
-function renderContract(){ $('#contract-content').innerHTML=`<div class="contract-grid"><div class="contract-summary"><p class="section-kicker">DEMO-CONTRACT</p><h3>${tx('contractHeading')}</h3><p>${tx('contractText')}</p></div><div class="mini-stats"><div><strong>5</strong><span>KPIs</span></div><div><strong>2</strong><span>${state.language==='ar'?'خروقات':'Breaches'}</span></div><div><strong>3</strong><span>${state.language==='ar'?'استثناءات':'Exceptions'}</span></div><div><strong>1</strong><span>${state.language==='ar'?'بوابة اعتماد':'Approval gate'}</span></div></div></div>`; }
-function renderReports(){ const r=[[tx('reportMonthly'),'31 Aug 2026',tx('reportDraft'),'M'],[tx('reportQuarterly'),'Q3 2026',tx('reportNotGenerated'),'Q'],[tx('reportAnnual'),'2026',tx('reportNotGenerated'),'A']]; $('#report-cards').innerHTML=`<div class="report-grid">${r.map(([n,d,s,i],x)=>`<article class="report-card"><span class="report-icon">${i}</span><div><b>${n}</b><p>${d}</p><small>${s}</small></div>${x===0?`<button data-report type="button">${tx('details')} ↗</button>`:''}</article>`).join('')}</div><div class="report-preview" id="report-preview"></div>`; $('[data-report]')?.addEventListener('click',()=>$('#report-preview').innerHTML=`<b>${tx('reportSummary')}</b><p>${tx('reportBody')}</p>`); }
-function renderAgents(){ $('#agent-list').innerHTML=state.agents.map(a=>`<div class="agent-row"><span>AI</span><div><b>${local(a)}</b><small>${local(a,'Detail')}</small></div><i>${local(a,'State')}</i></div>`).join(''); }
-const gisCopy = {
-  ar: {
-    kicker: 'نموذج GIS تشغيلي', title: 'خريطة شبكة الخط الأحمر', description: 'اعرض طبقات الأصول والأعطال وأوامر العمل في سياق شبكي توضيحي. جميع المواقع والحالات اصطناعية ومحلية.', boundaryTitle: 'محاكاة محلية', boundaryCopy: 'لا توجد إحداثيات أو بيانات تشغيلية حية', layersTitle: 'طبقات الخريطة', layersCopy: 'اختر ما يظهر في مساحة العمل', assets: 'الأصول', assetsCount: '6 نقاط مراقبة', faults: 'الأعطال', faultsCount: 'استثناء حرج واحد', workorders: 'أوامر العمل', workordersCount: '3 عناصر مفتوحة', filter: 'تصفية الحالة', clear: 'مسح', all: 'الكل', critical: 'حرج', watch: 'متابعة', stable: 'مستقر', streamTitle: 'متزامن مع المحاكاة', streamCopy: 'تُحدّث الحالات عند وصول إشارة TLM', mapMode: 'عرض تشغيلي', mapScope: 'نطاق تجريبي · الخط الأحمر', centre: 'المركز المالي', museum: 'منطقة المتحف', marina: 'المارينا', terminal: 'المحطة الطرفية', atc: 'تحكم آلي · متابعة', signal: 'إشارات · مستقر', fault: 'تنبيه MTTR', woOne: 'مفتوح · PM', woTwo: 'مجدول', captionTitle: 'محاكاة شبكة حضرية', captionCopy: 'لا تمثل الموقع أو الأبعاد أو مسار دبي مترو الفعلي.', inspectorTitle: 'مستكشف الشبكة', inspectorCopy: 'اختر محطة أو رمزاً على الخريطة لمراجعة الحالة والأدلة وارتباط القرار.', evidence: 'مسار الدليل', decision: 'عرض حزمة القرار ↗', statusTitle: 'الشبكة مستقرة ضمن نطاق العرض التجريبي', statusCopy: '1 حرج · 2 متابعة · 3 مستقرة · يتم التحديث محلياً فقط', station: 'محطة', asset: 'أصل', faultType: 'تنبيه عطل', workorder: 'أمر عمل', statusStable: 'مستقر', statusWatch: 'متابعة', statusCritical: 'حرج', telemetry: 'آخر إشارة توضيحية'
-  },
-  en: {
-    kicker: 'OPERATIONAL GIS MODEL', title: 'Red Line network map', description: 'Review asset, fault, and work-order layers in an illustrative network context. All positions and states are synthetic and local.', boundaryTitle: 'Local simulation', boundaryCopy: 'No live coordinates or operational data', layersTitle: 'Map layers', layersCopy: 'Choose what is visible in the workspace', assets: 'Assets', assetsCount: '6 monitored points', faults: 'Faults', faultsCount: '1 critical exception', workorders: 'Work orders', workordersCount: '3 open items', filter: 'Filter by state', clear: 'Clear', all: 'All', critical: 'Critical', watch: 'Watch', stable: 'Stable', streamTitle: 'Synced to simulation', streamCopy: 'States update when a TLM signal arrives', mapMode: 'Operational view', mapScope: 'Pilot scope · Red Line', centre: 'Financial Centre', museum: 'Museum District', marina: 'Marina', terminal: 'Terminal', atc: 'ATC · Watch', signal: 'Signalling · Stable', fault: 'MTTR alert', woOne: 'Open · PM', woTwo: 'Scheduled', captionTitle: 'Urban network simulation', captionCopy: 'Does not represent the location, dimensions, or actual Dubai Metro alignment.', inspectorTitle: 'Network explorer', inspectorCopy: 'Select a station or symbol to review state, evidence, and decision linkage.', evidence: 'Evidence trail', decision: 'Open decision pack ↗', statusTitle: 'Network stable within the illustrative scope', statusCopy: '1 critical · 2 watch · 3 stable · locally updated only', station: 'Station', asset: 'Asset', faultType: 'Fault alert', workorder: 'Work order', statusStable: 'Stable', statusWatch: 'Watch', statusCritical: 'Critical', telemetry: 'Latest illustrative signal'
+
+function exceptionCopy(exception) {
+  const k = pack.kpis.find((item) => item.id === exception.kpiId);
+  const value = `${fmtValue(k.id, k.value)}${unit(k.unit)}`;
+  const target = targetText(k);
+  const name = kpiName(k.id);
+  if (isAr()) {
+    const title = exception.severity === 'critical' ? `خرق متكرر لمؤشر ${name}` : `خرق مؤشر ${name}`;
+    const detail = `${name} عند ${value} مقابل حد تجريبي ${target}. ${exception.severity === 'critical' ? 'تم التصعيد إلى حرج بسبب خروق سابقة مسجلة.' : 'يجب التحقق من تصنيف البيانات قبل اعتماد أي إجراء.'}`;
+    const decision = exception.severity === 'critical' ? 'يلزم مراجعة مالك صيانة أو عقد مُسمى للسبب الجذري والمعالجة قبل اعتماد التقرير.' : 'راجع السبب والأدلة والإجراء التصحيحي خلال دورة التقرير الحالية.';
+    return { title, detail, decision, alt: exception.title };
   }
+  return { title: exception.title, detail: exception.whyItMatters, decision: exception.decisionRequired ?? '', alt: `خرق مؤشر ${name}` };
+}
+
+/* ---------- Renderers ---------- */
+
+function currentSnapshot() { return pack.timeline[state.telemetry.index]; }
+
+function renderKpis() {
+  const snapshot = currentSnapshot();
+  $('#kpi-grid').innerHTML = pack.kpis.map((k) => {
+    const live = snapshot.kpis.find((item) => item.id === k.id);
+    const view = { ...k, value: live.value, status: live.status };
+    const cls = cardStatus(view);
+    return `<article class="metric-card metric-card--${cls}" data-kpi="${k.id}" tabindex="0" role="button"><div class="metric-top"><span class="metric-icon">${kpiLabels[k.id].icon}</span><span class="metric-trend"><i></i>${trendText(view)}</span></div><strong><span class="metric-value">${fmtValue(k.id, view.value)}</span><small>${unit(k.unit)}</small></strong><b>${kpiName(k.id)}</b><small class="metric-secondary">${tx('target')} ${targetText(k)} · ${k.formulaVersion}</small><span class="metric-rule"></span><span class="metric-live" aria-hidden="true"></span></article>`;
+  }).join('');
+  $$('[data-kpi]').forEach((card) => {
+    card.addEventListener('click', () => openDecision(card.dataset.kpi));
+    card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openDecision(card.dataset.kpi); } });
+  });
+}
+
+function renderDecisions() {
+  $('#decision-list').innerHTML = pack.exceptions.map((x, i) => {
+    const copy = exceptionCopy(x);
+    const route = routing[x.severity];
+    return `<article class="decision-item decision-item--${x.severity}"><span class="decision-rail"></span><span class="decision-index">0${i + 1}</span><div class="decision-content"><div class="decision-title"><div><b>${copy.title}</b><small>${copy.alt}</small></div>${status(x.severity)}</div><p>${copy.detail}</p><div class="decision-meta"><span>⌁ ${pick(route, 'Owner')}</span><span>◷ ${pick(route, 'Due')}</span><span dir="ltr">${exceptionCode(x)}</span></div></div><button class="decision-action" data-decision="${x.kpiId}" type="button">${isAr() ? 'اعرض الأدلة' : 'Open evidence'} <i>‹</i></button></article>`;
+  }).join('');
+  $$('[data-decision]').forEach((b) => b.addEventListener('click', () => openDecision(b.dataset.decision)));
+}
+
+function renderExceptionTable() {
+  $('#exception-count').textContent = `${pack.exceptions.length} ${isAr() ? 'مفتوحة' : 'open'}`;
+  const h = isAr() ? ['الحالة', 'الاستثناء', 'الأدلة', 'الإجراء المطلوب'] : ['Severity', 'Exception', 'Evidence', 'Decision required'];
+  $('#exception-table').innerHTML = `<div class="data-table"><div class="table-row table-head">${h.map((v) => `<span>${v}</span>`).join('')}</div>${pack.exceptions.map((x) => { const copy = exceptionCopy(x); return `<div class="table-row"><span>${status(x.severity)}</span><span><b>${copy.title}</b><small>${copy.detail}</small></span><span dir="ltr">${sourceLabel(x.evidence)}</span><span>${copy.decision}</span></div>`; }).join('')}</div>`;
+}
+
+function renderAssets() {
+  const h = isAr() ? ['الأصل', 'الفئة', 'الموقع', 'أوامر مفتوحة', 'أعطال', 'توقف (دقيقة)'] : ['Asset', 'Class', 'Location', 'Open WOs', 'Failures', 'Downtime (min)'];
+  $('#asset-table').innerHTML = `<div class="data-table asset-table"><div class="table-row table-head">${h.map((v) => `<span>${v}</span>`).join('')}</div>${pack.assets.map((a) => { const meta = assetLabels[a.assetId] ?? { arClass: '—', enClass: '—', arLocation: '—', enLocation: '—' }; return `<div class="table-row"><span><b dir="ltr">${a.assetId}</b></span><span>${pick(meta, 'Class')}</span><span>${pick(meta, 'Location')}</span><span>${a.openWorkOrders}</span><span>${a.failureWorkOrders}</span><span>${a.downtimeMinutes}</span></div>`; }).join('')}</div>`;
+}
+
+function renderContract() {
+  const ct = pack.controlTower;
+  const heading = isAr() ? 'الأداء الشهري · أغسطس 2026' : 'Monthly Performance · August 2026';
+  const text = isAr() ? 'يوضح هذا النموذج الأولي طبقة ذكاء مشتركة بين المالك والمقاول. يجب استبدال بنود العقد والصيغ والحدود بتعريفات معتمدة رسمياً قبل الإنتاج.' : 'This P0 demonstrates a shared intelligence layer for the owner and contractor. Contract clauses, formulas, and thresholds must be replaced with formally approved definitions before production.';
+  $('#contract-content').innerHTML = `<div class="contract-grid"><div class="contract-summary"><p class="section-kicker">${pack.report.contractId}</p><h3>${heading}</h3><p>${text}</p></div><div class="mini-stats"><div><strong>${ct.kpiCount}</strong><span>KPIs</span></div><div><strong>${ct.breach}</strong><span>${isAr() ? 'خروقات' : 'Breaches'}</span></div><div><strong>${ct.attentionRequired}</strong><span>${isAr() ? 'استثناءات' : 'Exceptions'}</span></div><div><strong>${ct.criticalExceptions}</strong><span>${isAr() ? 'حرج' : 'Critical'}</span></div></div></div>`;
+}
+
+function reportBody() {
+  const ct = pack.controlTower;
+  if (isAr()) return `${ct.withinTarget} من ${ct.kpiCount} مؤشرات تجريبية ضمن المستهدف. ${ct.breach} خرق للمؤشرات، منها ${ct.criticalExceptions} حرج و${ct.highExceptions} مرتفع. هذا الملخص حتمي ولا يحتوي على حقائق مولدة من نموذج لغوي.`;
+  return pack.summary;
+}
+
+function renderReports() {
+  const gate = pack.approvalGate;
+  const monthly = tx('status')[pack.report.status];
+  const r = [[tx('reportMonthly'), '31 Aug 2026', monthly, 'M'], [tx('reportQuarterly'), 'Q3 2026', tx('reportNotGenerated'), 'Q'], [tx('reportAnnual'), '2026', tx('reportNotGenerated'), 'A']];
+  $('#report-cards').innerHTML = `<div class="report-grid">${r.map(([n, d, s, i], x) => `<article class="report-card"><span class="report-icon">${i}</span><div><b>${n}</b><p>${d}</p><small>${s}</small></div>${x === 0 ? `<button data-report type="button">${tx('details')} ↗</button>` : ''}</article>`).join('')}</div><div class="report-preview" id="report-preview"></div>`;
+  $('[data-report]')?.addEventListener('click', () => {
+    const next = gate.nextTransitions.map((t) => tx('transition')[t]).join(' · ') || '—';
+    const blockers = gate.blockers.length ? `<ul>${gate.blockers.map((b) => `<li>${b}</li>`).join('')}</ul>` : `<p>${tx('noBlockers')}</p>`;
+    $('#report-preview').innerHTML = `<b>${tx('reportSummary')}</b><p>${reportBody()}</p><b>${tx('approvalGate')}: ${tx('status')[gate.status]}</b><p>${tx('nextStep')}: ${next}</p><b>${tx('blockers')}</b>${blockers}<small dir="ltr">${pack.report.reportId} · ${pack.provenance.formulaVersion}</small>`;
+  });
+}
+
+function renderAgents() {
+  $('#agent-list').innerHTML = pack.agents.map((a) => {
+    const meta = agentLabels[a.id] ?? { ar: a.name, arDetail: '', enDetail: '' };
+    const name = isAr() ? meta.ar : a.name;
+    const stateLabel = a.id === 'reporting' ? tx('humanGate') : a.mayUseModel ? tx('modelModes') : tx('deterministicModes');
+    return `<div class="agent-row"><span>AI</span><div><b>${name}</b><small>${pick(meta, 'Detail')} · <span dir="ltr">${a.allowedActionModes.join(' / ')}</span></small></div><i>${stateLabel}</i></div>`;
+  }).join('');
+}
+
+/* ---------- Grounded answers composed from pack numbers ---------- */
+
+function answerText(kind) {
+  const ct = pack.controlTower;
+  const breaches = pack.kpis.filter((k) => k.status === 'breach');
+  const breachList = breaches.map((k) => `${kpiName(k.id)} ${fmtValue(k.id, k.value)}${unit(k.unit)} ${isAr() ? 'مقابل' : 'versus'} ${targetText(k)}`).join(isAr() ? '، و' : ', and ');
+  const open = openWorkOrders();
+  if (kind === 'attention') {
+    return isAr()
+      ? `يتطلب ${ct.attentionRequired} استثناء الانتباه: ${pack.exceptions.map((x) => exceptionCopy(x).title).join('، و')}. يوجد ${open} أوامر عمل مفتوحة. كل النتائج مرتبطة بسجلات Maximo اصطناعية ومحسوبة بمحرك KPI الحتمي.`
+      : `${ct.attentionRequired} exception(s) require attention: ${pack.exceptions.map((x) => x.title).join(', and ')}. ${open} work orders remain open. Every result is linked to synthetic Maximo records and computed by the deterministic KPI engine.`;
+  }
+  if (kind === 'evidence') {
+    const total = pack.kpis.reduce((sum, k) => sum + k.evidence.length, 0);
+    return isAr()
+      ? `كل مؤشر من المؤشرات الخمسة يحمل ${pack.kpis[0].evidence.length} سجلات مصدر (${total} إحالة إجمالاً). بوابة الإرسال للمراجعة: ${pack.approvalGate.blockers.length ? pack.approvalGate.blockers.join(' ') : 'لا موانع'}. لا يتعامل العرض مع بيانات تشغيلية أو تعاقدية حية.`
+      : `Each of the ${pack.kpis.length} KPIs carries ${pack.kpis[0].evidence.length} source records (${total} references in total). Submission gate: ${pack.approvalGate.blockers.length ? pack.approvalGate.blockers.join(' ') : 'no blockers'}. This interface does not handle live operational or contractual data.`;
+  }
+  if (kind === 'breaches') {
+    return isAr() ? `يوجد ${breaches.length} خرق لمؤشرات تجريبية: ${breachList}.` : `There are ${breaches.length} demo KPI breaches: ${breachList}.`;
+  }
+  const gateStatus = tx('status')[pack.report.status];
+  return isAr()
+    ? `${pack.report.status === 'approved' || pack.report.status === 'locked' ? 'نعم' : 'لا'}. التقرير الشهري في حالة "${gateStatus}"، والانتقال التالي المسموح هو ${pack.approvalGate.nextTransitions.map((t) => tx('transition')[t]).join(' / ') || 'لا شيء'}. ${ct.criticalExceptions ? `يوجد ${ct.criticalExceptions} استثناء حرج يستلزم اعتماداً بشرياً مُسمى مع ملاحظة معالجة.` : ''}`
+    : `${pack.report.status === 'approved' || pack.report.status === 'locked' ? 'Yes' : 'No'}. The monthly report is "${gateStatus}"; the next allowed transition is ${pack.approvalGate.nextTransitions.map((t) => tx('transition')[t]).join(' / ') || 'none'}. ${ct.criticalExceptions ? `${ct.criticalExceptions} critical exception(s) require a named human approval with a mitigation note.` : ''}`;
+}
+
+const footer = () => (isAr() ? 'لا يتم نشر أي قرار عالي الأثر قبل اعتماد بشري مُسمى.' : 'No high-impact decision is released before named human approval.');
+
+function answer(kind, target = '#query-output') {
+  const o = $(target);
+  if (o) o.innerHTML = `<b>${tx('analysisReady')}</b><p>${answerText(kind)}</p><small>✓ ${footer()}</small>`;
+}
+
+/* Availability trend drawn from the engine's period replay, not a decorative path. */
+function renderPulse() {
+  const wrap = $('.chart-wrap');
+  if (!wrap) return;
+  const points = pack.timeline.map((snapshot) => snapshot.kpis.find((k) => k.id === 'availability').value);
+  const threshold = pack.kpis.find((k) => k.id === 'availability').threshold ?? 100;
+  const min = Math.min(...points, threshold) - 0.5;
+  const max = Math.max(...points, threshold) + 0.3;
+  const x = (i) => (points.length === 1 ? 360 : (i / (points.length - 1)) * 720);
+  const y = (v) => 200 - ((v - min) / (max - min)) * 170;
+  const line = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const area = `${line} L720 220 L0 220 Z`;
+  const nodes = points.map((v, i) => `<circle class="chart-node${v < threshold ? ' watch' : ''}" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="${i === points.length - 1 ? 6 : 4.5}"><title>${pack.timeline[i].trigger}: ${v}%</title></circle>`).join('');
+  const ty = y(threshold).toFixed(1);
+  wrap.innerHTML = `<svg viewBox="0 0 720 220" role="img" aria-label="Availability replay"><defs><linearGradient id="rail-fill" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#0e5ba8" stop-opacity=".22"/><stop offset="1" stop-color="#0e5ba8" stop-opacity="0"/></linearGradient></defs><g class="chart-grid"><line x1="0" y1="30" x2="720" y2="30"/><line x1="0" y1="85" x2="720" y2="85"/><line x1="0" y1="140" x2="720" y2="140"/><line x1="0" y1="195" x2="720" y2="195"/></g><line x1="0" y1="${ty}" x2="720" y2="${ty}" stroke="#b9730d" stroke-dasharray="6 6" stroke-width="1.5"/><text x="6" y="${(Number(ty) - 6).toFixed(1)}" font-size="11" fill="#b9730d">${tx('target')} ${threshold}%</text><path class="chart-area" d="${area}"/><path class="chart-line" d="${line}"/>${nodes}</svg><div class="chart-axis">${pack.timeline.map((snapshot) => `<span dir="ltr">${snapshot.trigger === 'PERIOD-CLOSE' ? tx('periodClose') : snapshot.trigger.replace('WO-', '')}</span>`).join('')}</div>`;
+  const text = $('[data-i18n="performanceText"]');
+  const below = points.filter((v) => v < threshold).length;
+  if (text) text.textContent = isAr() ? `مسار التوافر عبر ${points.length} إعادة حساب حتمية للفترة؛ ${below} منها أقل من الحد التجريبي.` : `Availability across ${points.length} deterministic period recomputations; ${below} fall below the demo threshold.`;
+}
+
+/* Evidence chain rendered from the highest-severity exception in the pack. */
+function renderEvidenceChain() {
+  const items = $$('.evidence-flow li small');
+  if (items.length < 3) return;
+  const top = [...pack.exceptions].sort((a, b) => ['critical', 'high', 'watch'].indexOf(a.severity) - ['critical', 'high', 'watch'].indexOf(b.severity))[0];
+  const k = pack.kpis.find((item) => item.id === (top?.kpiId ?? 'availability'));
+  const first = (top?.evidence ?? k.evidence)[0];
+  items[0].textContent = first ? `${first.sourceSystem === 'maximo' ? 'Maximo Demo' : first.sourceSystem} · ${first.entityId}` : '—';
+  items[0].setAttribute('dir', 'ltr');
+  items[1].textContent = `${kpiName(k.id)} · ${k.formulaVersion}`;
+  items[2].textContent = isAr() ? 'قيد مراجعة بشرية' : en.awaitingReview;
+}
+
+/* ---------- GIS ---------- */
+
+const gisCopy = {
+  ar: { kicker: 'نموذج GIS تشغيلي', title: 'خريطة شبكة الخط الأحمر', description: 'اعرض طبقات الأصول والأعطال وأوامر العمل في سياق شبكي توضيحي. جميع المواقع والحالات اصطناعية ومحلية.', boundaryTitle: 'محاكاة محلية', boundaryCopy: 'لا توجد إحداثيات أو بيانات تشغيلية حية', layersTitle: 'طبقات الخريطة', layersCopy: 'اختر ما يظهر في مساحة العمل', assets: 'الأصول', faults: 'الأعطال', workorders: 'أوامر العمل', filter: 'تصفية الحالة', clear: 'مسح', all: 'الكل', critical: 'حرج', watch: 'متابعة', stable: 'مستقر', streamTitle: 'متزامن مع المحاكاة', streamCopy: 'تُحدّث الحالات عند وصول إشارة TLM', mapMode: 'عرض تشغيلي', mapScope: 'نطاق تجريبي · الخط الأحمر', centre: 'المركز المالي', museum: 'منطقة المتحف', marina: 'المارينا', terminal: 'المحطة الطرفية', atc: 'تحكم آلي · متابعة', signal: 'إشارات · مستقر', fault: 'تنبيه MTTR', woOne: 'مفتوح · PM', woTwo: 'مجدول', captionTitle: 'محاكاة شبكة حضرية', captionCopy: 'لا تمثل الموقع أو الأبعاد أو مسار دبي مترو الفعلي.', inspectorTitle: 'مستكشف الشبكة', inspectorCopy: 'اختر محطة أو رمزاً على الخريطة لمراجعة الحالة والأدلة وارتباط القرار.', evidence: 'مسار الدليل', decision: 'عرض حزمة القرار ↗', statusTitle: 'الشبكة مستقرة ضمن نطاق العرض التجريبي', station: 'محطة', asset: 'أصل', faultType: 'تنبيه عطل', workorder: 'أمر عمل', statusStable: 'مستقر', statusWatch: 'متابعة', statusCritical: 'حرج', telemetry: 'آخر إشارة توضيحية' },
+  en: { kicker: 'OPERATIONAL GIS MODEL', title: 'Red Line network map', description: 'Review asset, fault, and work-order layers in an illustrative network context. All positions and states are synthetic and local.', boundaryTitle: 'Local simulation', boundaryCopy: 'No live coordinates or operational data', layersTitle: 'Map layers', layersCopy: 'Choose what is visible in the workspace', assets: 'Assets', faults: 'Faults', workorders: 'Work orders', filter: 'Filter by state', clear: 'Clear', all: 'All', critical: 'Critical', watch: 'Watch', stable: 'Stable', streamTitle: 'Synced to simulation', streamCopy: 'States update when a TLM signal arrives', mapMode: 'Operational view', mapScope: 'Pilot scope · Red Line', centre: 'Financial Centre', museum: 'Museum District', marina: 'Marina', terminal: 'Terminal', atc: 'ATC · Watch', signal: 'Signalling · Stable', fault: 'MTTR alert', woOne: 'Open · PM', woTwo: 'Scheduled', captionTitle: 'Urban network simulation', captionCopy: 'Does not represent the location, dimensions, or actual Dubai Metro alignment.', inspectorTitle: 'Network explorer', inspectorCopy: 'Select a station or symbol to review state, evidence, and decision linkage.', evidence: 'Evidence trail', decision: 'Open decision pack ↗', statusTitle: 'Network stable within the illustrative scope', station: 'Station', asset: 'Asset', faultType: 'Fault alert', workorder: 'Work order', statusStable: 'Stable', statusWatch: 'Watch', statusCritical: 'Critical', telemetry: 'Latest illustrative signal' },
 };
 
-const gisRecords = {
-  centre: { type: 'station', status: 'stable', arName: 'محطة المركز المالي', enName: 'Financial Centre Station', arContext: 'نقطة شبكة مستقرة ضمن نموذج الخط الأحمر التوضيحي.', enContext: 'A stable network point within the illustrative Red Line model.', arFacts: [['حالة الخدمة', 'مستقر'], ['أصول مرتبطة', '2'], ['آخر تحديث', 'TLM محلي']], enFacts: [['Service state', 'Stable'], ['Linked assets', '2'], ['Latest refresh', 'Local TLM']], evidence: 'GIS Demo · ST-01', decision: 'DEC-043' },
-  museum: { type: 'station', status: 'watch', arName: 'محطة منطقة المتحف', enName: 'Museum District Station', arContext: 'نقطة متابعة تتيح لمالك القرار مراجعة الحمل الوقائي المجدول.', enContext: 'A watch point for the decision owner to review scheduled preventive workload.', arFacts: [['حالة الخدمة', 'متابعة'], ['أوامر مفتوحة', '1'], ['نافذة المراجعة', 'يوم عمل']], enFacts: [['Service state', 'Watch'], ['Open work orders', '1'], ['Review window', 'One business day']], evidence: 'GIS Demo · ST-02 · WO-1005', decision: 'DEC-044' },
-  marina: { type: 'station', status: 'critical', arName: 'محطة المارينا', enName: 'Marina Station', arContext: 'نقطة محاكاة مرتبطة باستثناء زمن الإصلاح المتكرر وتستلزم مراجعة مسمّاة.', enContext: 'A simulated point linked to the persistent repair-time exception and requiring named review.', arFacts: [['حالة الخدمة', 'حرج'], ['المؤشر المرتبط', 'MTTR 2.75h'], ['المراجعة', 'خلال 4 ساعات']], enFacts: [['Service state', 'Critical'], ['Linked metric', 'MTTR 2.75h'], ['Review', 'Within 4 hours']], evidence: 'GIS Demo · ST-03 · DEC-042', decision: 'DEC-042' },
-  terminal: { type: 'station', status: 'stable', arName: 'المحطة الطرفية', enName: 'Terminal Station', arContext: 'نقطة طرفية مستقرة في مخطط العرض، مع عدم وجود إجراء مطلوب.', enContext: 'A stable terminal point in the presentation schematic with no action required.', arFacts: [['حالة الخدمة', 'مستقر'], ['أوامر مفتوحة', '0'], ['القرار', 'لا يلزم']], enFacts: [['Service state', 'Stable'], ['Open work orders', '0'], ['Decision', 'None required']], evidence: 'GIS Demo · ST-04', decision: 'DEC-043' },
-  atc: { type: 'asset', status: 'watch', arName: 'ATC-ZC-01', enName: 'ATC-ZC-01', arContext: 'أصل تحكم آلي ضمن عينة المحاكاة، مرتبط بنقطة متابعة جودة الخدمة.', enContext: 'An automatic-train-control asset in the simulation sample, linked to a service-quality watch point.', arFacts: [['الفئة', 'تحكم آلي'], ['الحالة', 'متابعة'], ['أمر مفتوح', 'WO-1005']], enFacts: [['Class', 'Automatic train control'], ['State', 'Watch'], ['Open order', 'WO-1005']], evidence: 'Maximo Demo · ATC-ZC-01', decision: 'DEC-043' },
-  signal: { type: 'asset', status: 'stable', arName: 'SIG-CB-14', enName: 'SIG-CB-14', arContext: 'أصل إشارات مستقر في العينة، يُعرض لتوضيح طبقة الأصول فقط.', enContext: 'A stable signalling asset in the sample, shown to illustrate the asset layer only.', arFacts: [['الفئة', 'إشارات'], ['الحالة', 'مستقر'], ['تغطية الدليل', 'مكتملة']], enFacts: [['Class', 'Signalling'], ['State', 'Stable'], ['Evidence coverage', 'Complete']], evidence: 'Maximo Demo · SIG-CB-14', decision: 'DEC-043' },
-  fault: { type: 'faultType', status: 'critical', arName: 'تنبيه MTTR متكرر', enName: 'Persistent MTTR alert', arContext: 'تنبيه استثنائي تولّده قواعد KPI التجريبية، وليس إنذاراً مباشراً من نظام تحكم.', enContext: 'An exception alert generated by demo KPI rules, not a direct control-system alarm.', arFacts: [['الشدة', 'حرج'], ['قاعدة KPI', 'MTTR v1.0'], ['الحالة', 'مراجعة بشرية']], enFacts: [['Severity', 'Critical'], ['KPI rule', 'MTTR v1.0'], ['State', 'Human review']], evidence: 'Maximo Demo · WO-1001–WO-1004', decision: 'DEC-042' },
-  'wo-1': { type: 'workorder', status: 'watch', arName: 'WO-1005', enName: 'WO-1005', arContext: 'أمر صيانة وقائية مفتوح ضمن الحزمة الاصطناعية، ويتطلب تأكيد الجدولة.', enContext: 'An open preventive-maintenance order in the synthetic pack, requiring schedule confirmation.', arFacts: [['الحالة', 'WAPPR'], ['الفئة', 'صيانة وقائية'], ['الاستحقاق', 'يوم عمل']], enFacts: [['State', 'WAPPR'], ['Class', 'Preventive maintenance'], ['Due', 'One business day']], evidence: 'Maximo Demo · WO-1005', decision: 'DEC-044' },
-  'wo-2': { type: 'workorder', status: 'stable', arName: 'WO-1006', enName: 'WO-1006', arContext: 'أمر عمل مجدول في المحاكاة، مع مسار دليل يمكن عرضه قبل اتخاذ القرار.', enContext: 'A scheduled work order in the simulation, with an evidence trail available before a decision.', arFacts: [['الحالة', 'مجدول'], ['الفئة', 'فحص دوري'], ['الاستحقاق', 'مؤكد']], enFacts: [['State', 'Scheduled'], ['Class', 'Periodic inspection'], ['Due', 'Confirmed']], evidence: 'Maximo Demo · WO-1006', decision: 'DEC-044' }
-};
+const mttrText = () => { const k = pack.kpis.find((item) => item.id === 'mttr'); return `MTTR ${fmtValue('mttr', k.value)}${unit(k.unit)}`; };
+const assetFacts = (id) => pack.assets.find((a) => a.assetId === id);
+
+/* GIS positions and station names are illustrative. Facts referencing KPIs, work orders or assets are read from the pack. */
+const gisRecords = () => ({
+  centre: { type: 'station', status: 'stable', arName: 'محطة المركز المالي', enName: 'Financial Centre Station', arContext: 'نقطة شبكة مستقرة ضمن نموذج الخط الأحمر التوضيحي.', enContext: 'A stable network point within the illustrative Red Line model.', arFacts: [['حالة الخدمة', 'مستقر'], ['أصول مرتبطة', '2'], ['آخر تحديث', 'TLM محلي']], enFacts: [['Service state', 'Stable'], ['Linked assets', '2'], ['Latest refresh', 'Local TLM']], evidence: 'GIS Demo · ST-01', decision: 'availability' },
+  museum: { type: 'station', status: 'watch', arName: 'محطة منطقة المتحف', enName: 'Museum District Station', arContext: 'نقطة متابعة تتيح لمالك القرار مراجعة الحمل الوقائي المجدول.', enContext: 'A watch point for the decision owner to review scheduled preventive workload.', arFacts: [['حالة الخدمة', 'متابعة'], ['أوامر مفتوحة', String(assetFacts('ATC-ZC-01').openWorkOrders)], ['نافذة المراجعة', 'يوم عمل']], enFacts: [['Service state', 'Watch'], ['Open work orders', String(assetFacts('ATC-ZC-01').openWorkOrders)], ['Review window', 'One business day']], evidence: 'GIS Demo · ST-02 · WO-1005', decision: 'backlog' },
+  marina: { type: 'station', status: 'critical', arName: 'محطة المارينا', enName: 'Marina Station', arContext: 'نقطة محاكاة مرتبطة باستثناء زمن الإصلاح المتكرر وتستلزم مراجعة مسمّاة.', enContext: 'A simulated point linked to the persistent repair-time exception and requiring named review.', arFacts: [['حالة الخدمة', 'حرج'], ['المؤشر المرتبط', mttrText()], ['المراجعة', 'خلال 4 ساعات']], enFacts: [['Service state', 'Critical'], ['Linked metric', mttrText()], ['Review', 'Within 4 hours']], evidence: 'GIS Demo · ST-03 · EXC-MTTR', decision: 'mttr' },
+  terminal: { type: 'station', status: 'stable', arName: 'المحطة الطرفية', enName: 'Terminal Station', arContext: 'نقطة طرفية مستقرة في مخطط العرض، مع عدم وجود إجراء مطلوب.', enContext: 'A stable terminal point in the presentation schematic with no action required.', arFacts: [['حالة الخدمة', 'مستقر'], ['أوامر مفتوحة', '0'], ['القرار', 'لا يلزم']], enFacts: [['Service state', 'Stable'], ['Open work orders', '0'], ['Decision', 'None required']], evidence: 'GIS Demo · ST-04', decision: 'availability' },
+  atc: { type: 'asset', status: 'watch', arName: 'ATC-ZC-01', enName: 'ATC-ZC-01', arContext: 'أصل تحكم آلي ضمن عينة المحاكاة، مرتبط بنقطة متابعة جودة الخدمة.', enContext: 'An automatic-train-control asset in the simulation sample, linked to a service-quality watch point.', arFacts: [['الفئة', 'تحكم آلي'], ['أوامر مفتوحة', String(assetFacts('ATC-ZC-01').openWorkOrders)], ['أعطال الفترة', String(assetFacts('ATC-ZC-01').failureWorkOrders)]], enFacts: [['Class', 'Automatic train control'], ['Open orders', String(assetFacts('ATC-ZC-01').openWorkOrders)], ['Period failures', String(assetFacts('ATC-ZC-01').failureWorkOrders)]], evidence: 'Maximo Demo · ATC-ZC-01', decision: 'availability' },
+  signal: { type: 'asset', status: 'stable', arName: 'SIG-CB-14', enName: 'SIG-CB-14', arContext: 'أصل إشارات مستقر في العينة، يُعرض لتوضيح طبقة الأصول فقط.', enContext: 'A stable signalling asset in the sample, shown to illustrate the asset layer only.', arFacts: [['الفئة', 'إشارات'], ['الحالة', 'مستقر'], ['أوامر عمل', 'لا يوجد في العينة']], enFacts: [['Class', 'Signalling'], ['State', 'Stable'], ['Work orders', 'None in sample']], evidence: 'GIS Demo · SIG-CB-14', decision: 'availability' },
+  fault: { type: 'faultType', status: 'critical', arName: 'تنبيه MTTR متكرر', enName: 'Persistent MTTR alert', arContext: 'تنبيه استثنائي تولّده قواعد KPI التجريبية، وليس إنذاراً مباشراً من نظام تحكم.', enContext: 'An exception alert generated by demo KPI rules, not a direct control-system alarm.', arFacts: [['الشدة', 'حرج'], ['قاعدة KPI', `MTTR ${pack.provenance.formulaVersion}`], ['الحالة', 'مراجعة بشرية']], enFacts: [['Severity', 'Critical'], ['KPI rule', `MTTR ${pack.provenance.formulaVersion}`], ['State', 'Human review']], evidence: 'Maximo Demo · WO-1001…WO-1004', decision: 'mttr' },
+  'wo-1': { type: 'workorder', status: 'watch', arName: 'WO-1005', enName: 'WO-1005', arContext: 'أمر صيانة وقائية مفتوح ضمن الحزمة الاصطناعية، ويتطلب تأكيد الجدولة.', enContext: 'An open preventive-maintenance order in the synthetic pack, requiring schedule confirmation.', arFacts: [['الحالة', pack.workOrders.find((w) => w.workOrderId === 'WO-1005').status], ['الفئة', 'صيانة وقائية'], ['الاستحقاق', 'يوم عمل']], enFacts: [['State', pack.workOrders.find((w) => w.workOrderId === 'WO-1005').status], ['Class', 'Preventive maintenance'], ['Due', 'One business day']], evidence: 'Maximo Demo · WO-1005', decision: 'backlog' },
+  'wo-2': { type: 'workorder', status: 'stable', arName: 'WO-1006', enName: 'WO-1006', arContext: 'أمر عمل مجدول في المحاكاة، مع مسار دليل يمكن عرضه قبل اتخاذ القرار.', enContext: 'A scheduled work order in the simulation, with an evidence trail available before a decision.', arFacts: [['الحالة', pack.workOrders.find((w) => w.workOrderId === 'WO-1006').status], ['الفئة', 'صيانة وقائية'], ['الاستحقاق', 'مؤكد']], enFacts: [['State', pack.workOrders.find((w) => w.workOrderId === 'WO-1006').status], ['Class', 'Preventive maintenance'], ['Due', 'Confirmed']], evidence: 'Maximo Demo · WO-1006', decision: 'backlog' },
+});
 
 function renderGisText() {
   if (!$('#view-network')) return;
   const copy = gisCopy[state.language];
-  const values = { 'gis-kicker': 'kicker', 'gis-title': 'title', 'gis-description': 'description', 'gis-boundary-title': 'boundaryTitle', 'gis-boundary-copy': 'boundaryCopy', 'gis-layers-title': 'layersTitle', 'gis-layers-copy': 'layersCopy', 'gis-assets-label': 'assets', 'gis-assets-count': 'assetsCount', 'gis-faults-label': 'faults', 'gis-faults-count': 'faultsCount', 'gis-workorders-label': 'workorders', 'gis-workorders-count': 'workordersCount', 'gis-filter-label': 'filter', 'gis-clear-filter': 'clear', 'gis-stream-title': 'streamTitle', 'gis-stream-copy': 'streamCopy', 'gis-map-mode': 'mapMode', 'gis-map-scope': 'mapScope', 'gis-station-centre': 'centre', 'gis-station-museum': 'museum', 'gis-station-marina': 'marina', 'gis-station-terminal': 'terminal', 'gis-atc-label': 'atc', 'gis-signal-label': 'signal', 'gis-fault-label': 'fault', 'gis-wo-1-label': 'woOne', 'gis-wo-2-label': 'woTwo', 'gis-caption-title': 'captionTitle', 'gis-caption-copy': 'captionCopy', 'gis-inspector-title': 'inspectorTitle', 'gis-inspector-copy': 'inspectorCopy', 'gis-evidence-label': 'evidence', 'gis-open-decision': 'decision', 'gis-status-strip-title': 'statusTitle', 'gis-status-strip-copy': 'statusCopy' };
+  const values = { 'gis-kicker': 'kicker', 'gis-title': 'title', 'gis-description': 'description', 'gis-boundary-title': 'boundaryTitle', 'gis-boundary-copy': 'boundaryCopy', 'gis-layers-title': 'layersTitle', 'gis-layers-copy': 'layersCopy', 'gis-assets-label': 'assets', 'gis-faults-label': 'faults', 'gis-workorders-label': 'workorders', 'gis-filter-label': 'filter', 'gis-clear-filter': 'clear', 'gis-stream-title': 'streamTitle', 'gis-stream-copy': 'streamCopy', 'gis-map-mode': 'mapMode', 'gis-map-scope': 'mapScope', 'gis-station-centre': 'centre', 'gis-station-museum': 'museum', 'gis-station-marina': 'marina', 'gis-station-terminal': 'terminal', 'gis-atc-label': 'atc', 'gis-signal-label': 'signal', 'gis-fault-label': 'fault', 'gis-wo-1-label': 'woOne', 'gis-wo-2-label': 'woTwo', 'gis-caption-title': 'captionTitle', 'gis-caption-copy': 'captionCopy', 'gis-inspector-title': 'inspectorTitle', 'gis-inspector-copy': 'inspectorCopy', 'gis-evidence-label': 'evidence', 'gis-open-decision': 'decision', 'gis-status-strip-title': 'statusTitle' };
   Object.entries(values).forEach(([id, key]) => { const element = $(`#${id}`); if (element) element.textContent = copy[key]; });
+  $('#gis-assets-count').textContent = isAr() ? `${pack.assets.length} أصول في العينة` : `${pack.assets.length} assets in sample`;
+  $('#gis-faults-count').textContent = isAr() ? `${criticalCount()} استثناء حرج` : `${criticalCount()} critical exception(s)`;
+  $('#gis-workorders-count').textContent = isAr() ? `${openWorkOrders()} أوامر عمل مفتوحة` : `${openWorkOrders()} open work orders`;
+  const nodes = $$('[data-gis-node]');
+  const count = (s) => nodes.filter((n) => n.dataset.status === s).length;
+  $('#gis-status-strip-copy').textContent = isAr() ? `${count('critical')} حرج · ${count('watch')} متابعة · ${count('stable')} مستقرة · يتم التحديث محلياً فقط` : `${count('critical')} critical · ${count('watch')} watch · ${count('stable')} stable · locally updated only`;
   $$('.gis-filter').forEach((button) => { button.textContent = copy[button.dataset.gisFilter]; });
   [['.gis-station--a small', 'ST-01'], ['.gis-station--b small', 'ST-02'], ['.gis-station--c small', 'ST-03'], ['.gis-station--d small', 'ST-04']].forEach(([selector, code]) => { const node = $(selector); const parent = node?.closest('[data-gis-node]'); if (node && parent) node.textContent = `${code} · ${copy[`status${parent.dataset.status[0].toUpperCase()}${parent.dataset.status.slice(1)}`]}`; });
   renderGisStream();
@@ -83,7 +283,7 @@ function renderGisText() {
 function renderGisStream() {
   if (!$('#gis-map-events')) return;
   const copy = gisCopy[state.language];
-  const event = state.gis.eventLabel || (state.language === 'ar' ? 'TLM-000 · جاهز' : 'TLM-000 · Ready');
+  const event = state.gis.eventLabel || (isAr() ? 'TLM-000 · جاهز' : 'TLM-000 · Ready');
   $('#gis-map-events').textContent = `${copy.telemetry}: ${event}`;
 }
 
@@ -99,7 +299,7 @@ function applyGisFilters() {
 }
 
 function openGisInspector(nodeId) {
-  const record = gisRecords[nodeId];
+  const record = gisRecords()[nodeId];
   if (!record) return;
   const copy = gisCopy[state.language];
   state.gis.selected = nodeId;
@@ -128,57 +328,51 @@ function setGisZoom(nextZoom) {
   $('#gis-map-viewport').style.setProperty('--gis-zoom', String(state.gis.zoom));
 }
 
-function renderAll(){renderKpis();renderDecisions();renderExceptionTable();renderAssets();renderContract();renderReports();renderAgents();renderGisText();applyGisFilters();}
+/* ---------- Telemetry: deterministic replay of the period ---------- */
 
-const telemetrySignals = [
-  { asset: 'ATC-ZC-02', ar: 'نبضة صحة التحكم الآلي', en: 'ATC health pulse' },
-  { asset: 'TRAM-APS-03', ar: 'تأكيد حالة مصدر التغذية', en: 'Power-source status confirmed' },
-  { asset: 'ATC-ZC-01', ar: 'تحديث دورة الصيانة الوقائية', en: 'Preventive-maintenance cycle updated' },
-  { asset: 'MAXIMO-DEMO', ar: 'تحديث سجل مصدر توضيحي', en: 'Illustrative source record refreshed' },
-];
-
-function telemetryValue(value, precision, index) {
-  const waveform = Math.sin((state.telemetry.ticks + 1) * (1.21 + index * 0.19));
-  const amplitude = [0.018, 0, 1.6, 0.04, 0][index];
-  const next = value + waveform * amplitude;
-  if (precision === 0) return String(Math.round(next)).padStart(2, '0');
-  return next.toFixed(precision);
+function snapshotLabel(snapshot) {
+  const trigger = snapshot.trigger === 'PERIOD-CLOSE' ? tx('periodClose') : snapshot.trigger;
+  return `${trigger} · ${tx('asOf')} ${fmtDate(snapshot.asOf)} · ${snapshot.workOrdersSeen} ${tx('workOrdersSeen')}`;
 }
 
 function renderTelemetry() {
   const stream = state.telemetry;
-  const active = stream.active;
-  $('#telemetry-title').textContent = active ? tx('telemetryTitle') : tx('telemetryPaused');
+  const snapshot = currentSnapshot();
+  $('#telemetry-title').textContent = stream.active ? tx('telemetryTitle') : tx('telemetryPaused');
   $('#telemetry-source').textContent = tx('telemetrySource');
   $('#telemetry-label').textContent = tx('telemetryLast');
-  $('#telemetry-updated').textContent = stream.lastSignalAt ? `${stream.lastSignalAt} · ${stream.lastSignalLabel}` : (active ? tx('telemetryReady') : tx('telemetryPausedAt'));
-  $('#telemetry-toggle').setAttribute('aria-pressed', String(active));
-  $('#telemetry-toggle-icon').textContent = active ? 'Ⅱ' : '▶';
-  $('#telemetry-toggle-label').textContent = active ? tx('telemetryStop') : tx('telemetryStart');
-  $('#telemetry-dot').classList.toggle('telemetry-dot--paused', !active);
-  $('#telemetry-event').classList.toggle('telemetry-event--idle', !active);
+  $('#telemetry-updated').textContent = stream.lastSignalAt ? `${stream.lastSignalAt} · ${snapshotLabel(snapshot)}` : (stream.active ? tx('telemetryReady') : tx('telemetryPausedAt'));
+  $('#telemetry-event').textContent = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${snapshot.trigger}`;
+  $('#telemetry-toggle').setAttribute('aria-pressed', String(stream.active));
+  $('#telemetry-toggle-icon').textContent = stream.active ? 'Ⅱ' : '▶';
+  $('#telemetry-toggle-label').textContent = stream.active ? tx('telemetryStop') : tx('telemetryStart');
+  $('#telemetry-dot').classList.toggle('telemetry-dot--paused', !stream.active);
+  $('#telemetry-event').classList.toggle('telemetry-event--idle', !stream.active);
 }
 
-function emitTelemetry({ announce = false } = {}) {
-  const stream = state.telemetry;
-  stream.ticks += 1;
-  stream.eventId += 1;
-  const signal = telemetrySignals[stream.ticks % telemetrySignals.length];
-  state.kpis.forEach((kpi, index) => { kpi.value = telemetryValue(kpi.base, kpi.precision, index); });
-  $$('.metric-card').forEach((card, index) => {
-    const value = card.querySelector('.metric-value');
-    if (value) value.textContent = state.kpis[index].value;
-    card.classList.remove('metric-card--updating');
+function applySnapshotToCards() {
+  const snapshot = currentSnapshot();
+  $$('.metric-card').forEach((card) => {
+    const k = pack.kpis.find((item) => item.id === card.dataset.kpi);
+    const live = snapshot.kpis.find((item) => item.id === k.id);
+    const view = { ...k, value: live.value, status: live.status };
+    card.className = `metric-card metric-card--${cardStatus(view)}`;
+    card.querySelector('.metric-value').textContent = fmtValue(k.id, live.value);
+    card.querySelector('.metric-trend').innerHTML = `<i></i>${trendText(view)}`;
     void card.offsetWidth;
     card.classList.add('metric-card--updating');
   });
-  stream.lastSignalAt = new Date().toLocaleTimeString(state.language === 'ar' ? 'ar-AE' : 'en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  $('#telemetry-event').textContent = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${signal.asset}`;
-  stream.lastSignalLabel = state.language === 'ar' ? signal.ar : signal.en;
-  state.gis.eventLabel = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${state.language === 'ar' ? signal.ar : signal.en}`;
+}
+
+function emitTelemetry() {
+  const stream = state.telemetry;
+  stream.index = (stream.index + 1) % pack.timeline.length;
+  stream.eventId += 1;
+  applySnapshotToCards();
+  stream.lastSignalAt = new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  state.gis.eventLabel = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${currentSnapshot().trigger}`;
   renderTelemetry();
   renderGisStream();
-  if (announce) toast(state.language === 'ar' ? 'تم تحديث مؤشرات المحاكاة محلياً.' : 'Local simulation indicators updated.');
 }
 
 function startTelemetry({ immediate = false } = {}) {
@@ -197,68 +391,110 @@ function pauseTelemetry() {
 }
 
 function resetTelemetry() {
-  state.telemetry.ticks = 0;
+  state.telemetry.index = pack.timeline.length - 1;
   state.telemetry.eventId = 0;
   state.telemetry.lastSignalAt = null;
-  state.telemetry.lastSignalLabel = null;
-  state.kpis.forEach((kpi) => { kpi.value = kpi.precision === 0 ? String(kpi.base).padStart(2, '0') : Number(kpi.base).toFixed(kpi.precision); });
   renderKpis();
-  $('#telemetry-event').textContent = 'TLM-000 · BASELINE';
   renderTelemetry();
   toast(tx('telemetryReset'));
 }
 
-function openDecision(id){ const x=state.exceptions.find(v=>v.id===id)||state.exceptions[0]; $('#drawer-id').textContent=x.id; $('#drawer-content').innerHTML=`<div class="drawer-status">${status(x.severity)}</div><h3>${local(x)}</h3><small class="drawer-secondary">${state.language==='ar'?x.en:x.ar}</small><section class="drawer-block"><span>${tx('recommendation')}</span><p>${local(x,'Decision')} ${state.language==='ar'?'هذا مقترح للمراجعة فقط.':'This is a review-only proposal.'}</p></section><section class="drawer-evidence"><div><span>⌁</span><p><small>${tx('source')}</small><b dir="ltr">${x.evidence}</b></p></div><div><span>◷</span><p><small>${tx('observed')}</small><b>${local(x,'Fresh')}</b></p></div><div><span>✓</span><p><small>${tx('quality')}</small><b>${tx('verified')}</b></p></div></section><section class="governance-callout"><span>⌑</span><p><b>${tx('governance')}</b><small>${tx('noWrite')}</small></p></section><button class="review-button" id="request-review" type="button">✓ ${tx('requestReview')}</button><p class="review-note">◷ ${tx('reviewNote')}</p>`; $('#drawer-backdrop').hidden=false; document.body.classList.add('drawer-open'); $('#request-review')?.addEventListener('click',()=>{toast(tx('reviewReady'));closeDrawer();}); }
-function closeDrawer(){$('#drawer-backdrop').hidden=true;document.body.classList.remove('drawer-open');}
-function toast(message){const box=$('#toast');box.textContent=message;box.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>box.classList.remove('show'),2700);}
-function answer(kind,target='#query-output'){const o=$(target);if(o)o.innerHTML=`<b>${tx('analysisReady')}</b><p>${tx(kind)}</p><small>✓ ${state.language==='ar'?'لا يتم نشر أي قرار عالي الأثر قبل اعتماد بشري مُسمى.':'No high-impact decision is released before named human approval.'}</small>`;}
-function applyLanguage(){const isAr=state.language==='ar';document.documentElement.lang=state.language;document.documentElement.dir=isAr?'rtl':'ltr';document.title=isAr?'RailMind | منصة ذكاء الأصول':'RailMind | Asset Intelligence Platform';if(!isAr)$$('[data-i18n]').forEach(e=>{const key=e.dataset.i18n;if(en[key])e.textContent=en[key];});if(isAr)window.location.reload();$$('[data-i18n-option]').forEach(e=>{if(en[e.dataset.i18nOption])e.textContent=en[e.dataset.i18nOption];});$$('[data-i18n-placeholder]').forEach(e=>{if(en[e.dataset.i18nPlaceholder])e.placeholder=en[e.dataset.i18nPlaceholder];});$('#language-button b').textContent=isAr?'EN':'ع';renderAll();}
-function switchView(view){$$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$$('.view').forEach(s=>s.classList.toggle('active',s.id===`view-${view}`));$('#app-shell').classList.remove('menu-open');window.scrollTo({top:0,behavior:'smooth'});}
-function setup(){ $$('.nav-item').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view))); $('#language-button').addEventListener('click',()=>{state.language=state.language==='ar'?'en':'ar';applyLanguage();}); $('#menu-button').addEventListener('click',()=>$('#app-shell').classList.toggle('menu-open')); $('#refresh-button').addEventListener('click',()=>{ $('#updated-time').textContent=new Date().toLocaleTimeString(state.language==='ar'?'ar-AE':'en-GB',{hour:'2-digit',minute:'2-digit'});toast(tx('refreshed'));}); $('#density-button').addEventListener('click',()=>{state.compact=!state.compact;$('#app-shell').classList.toggle('compact',state.compact);toast(tx(state.compact?'compactOn':'compactOff'));}); $('#notifications').addEventListener('click',()=>toast(tx('notify'))); ['#safeguard-button','#boundary-button','#more-button'].forEach(s=>$(s).addEventListener('click',()=>toast(tx('guardrail')))); $('#view-all-button').addEventListener('click',()=>switchView('exceptions')); $('#open-brief-button').addEventListener('click',()=>openDecision('DEC-042')); $('#evidence-button').addEventListener('click',()=>openDecision('DEC-043')); $('#drawer-close').addEventListener('click',closeDrawer); $('#drawer-backdrop').addEventListener('click',(e)=>{if(e.target===$('#drawer-backdrop'))closeDrawer();}); $('#search-trigger').addEventListener('click',()=>{switchView('agents');setTimeout(()=>$('#agent-input').focus(),260);}); document.addEventListener('keydown',(e)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();switchView('agents');setTimeout(()=>$('#agent-input').focus(),260);}if(e.key==='Escape')closeDrawer();}); $$('[data-question]').forEach(b=>b.addEventListener('click',()=>{answer(b.dataset.question);answer(b.dataset.question,'#agent-answer');$('#agent-status').classList.add('ready');$('#agent-status b').textContent=tx('analysisReady');})); $('#agent-run').addEventListener('click',()=>{if(!$('#agent-input').value.trim()){toast(state.language==='ar'?'اكتب سؤالاً أو اختر اقتراحاً أولاً.':'Write a question or choose a suggestion first.');return;}const s=$('#agent-status');s.classList.add('working');s.querySelector('b').textContent=tx('working');setTimeout(()=>{s.classList.remove('working');s.classList.add('ready');s.querySelector('b').textContent=tx('analysisReady');answer('attention','#agent-answer');},620);}); }
-function setupTelemetryControls() {
-  $('#telemetry-toggle').addEventListener('click', () => {
-    if (state.telemetry.active) pauseTelemetry();
-    else startTelemetry({ immediate: true });
-  });
-  $('#telemetry-reset').addEventListener('click', () => resetTelemetry());
-  $('#language-button').addEventListener('click', () => window.setTimeout(renderTelemetry, 0));
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) window.clearInterval(state.telemetry.timer);
-    else if (state.telemetry.active) startTelemetry();
+/* ---------- Decision drawer (exception or KPI observation) ---------- */
+
+function openDecision(kpiId) {
+  const k = pack.kpis.find((item) => item.id === kpiId) ?? pack.kpis[0];
+  const exception = pack.exceptions.find((item) => item.kpiId === k.id);
+  const evidence = exception ? exception.evidence : k.evidence;
+  const observed = evidence.length ? `${fmtDate(evidence[0].observedAt)} → ${fmtDate(evidence[evidence.length - 1].observedAt)}` : '—';
+  const sev = exception ? exception.severity : 'good';
+  const copy = exception ? exceptionCopy(exception) : { title: kpiName(k.id), alt: k.name, decision: tx('kpiWithin') };
+  $('#drawer-id').textContent = exception ? exceptionCode(exception) : k.id.toUpperCase();
+  $('#drawer-content').innerHTML = `<div class="drawer-status">${status(sev)}</div><h3>${copy.title}</h3><small class="drawer-secondary">${copy.alt}</small><section class="drawer-block"><span>${kpiName(k.id)}</span><p><b dir="ltr">${fmtValue(k.id, k.value)}${unit(k.unit)}</b> · ${tx('target')} ${targetText(k)} · ${tx('formula')} <span dir="ltr">${k.formulaVersion}</span></p><small>${tx('engineLabel')}</small></section><section class="drawer-block"><span>${tx('recommendation')}</span><p>${copy.decision} ${isAr() ? 'هذا مقترح للمراجعة فقط.' : 'This is a review-only proposal.'}</p></section><section class="drawer-evidence"><div><span>⌁</span><p><small>${tx('source')}</small><b dir="ltr">${sourceLabel(evidence)}</b></p></div><div><span>◷</span><p><small>${tx('observed')}</small><b dir="ltr">${observed}</b></p></div><div><span>✓</span><p><small>${tx('quality')}</small><b>${tx('verified')} · ${evidence.length} ${tx('evidenceCount')}</b></p></div></section>${exception ? `<p class="review-note" dir="ltr">${tx('exceptionId')}: ${exception.id}</p>` : ''}<section class="governance-callout"><span>⌑</span><p><b>${tx('governance')}</b><small>${tx('noWrite')}</small></p></section><button class="review-button" id="request-review" type="button">✓ ${tx('requestReview')}</button><p class="review-note">◷ ${tx('reviewNote')}</p>`;
+  $('#drawer-backdrop').hidden = false;
+  document.body.classList.add('drawer-open');
+  $('#request-review')?.addEventListener('click', () => { toast(tx('reviewReady')); closeDrawer(); });
+}
+
+function closeDrawer() { $('#drawer-backdrop').hidden = true; document.body.classList.remove('drawer-open'); }
+function toast(message) { const box = $('#toast'); box.textContent = message; box.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => box.classList.remove('show'), 2700); }
+
+/* ---------- Language ---------- */
+
+function captureArabicBaseline() {
+  $$('[data-i18n]').forEach((e) => { e.dataset.arText = e.textContent; });
+  $$('[data-i18n-option]').forEach((e) => { e.dataset.arText = e.textContent; });
+  $$('[data-i18n-placeholder]').forEach((e) => { e.dataset.arText = e.placeholder; });
+}
+
+function applyLanguage() {
+  const arabic = isAr();
+  document.documentElement.lang = state.language;
+  document.documentElement.dir = arabic ? 'rtl' : 'ltr';
+  document.title = arabic ? 'RailMind | منصة ذكاء الأصول' : 'RailMind | Asset Intelligence Platform';
+  $$('[data-i18n]').forEach((e) => { const key = e.dataset.i18n; e.textContent = arabic ? e.dataset.arText : (en[key] ?? e.dataset.arText); });
+  $$('[data-i18n-option]').forEach((e) => { const key = e.dataset.i18nOption; e.textContent = arabic ? e.dataset.arText : (en[key] ?? e.dataset.arText); });
+  $$('[data-i18n-placeholder]').forEach((e) => { const key = e.dataset.i18nPlaceholder; e.placeholder = arabic ? e.dataset.arText : (en[key] ?? e.dataset.arText); });
+  $('#language-button b').textContent = arabic ? 'EN' : 'ع';
+  renderAll();
+  renderTelemetry();
+}
+
+function renderAll() { renderKpis(); renderDecisions(); renderExceptionTable(); renderAssets(); renderContract(); renderReports(); renderAgents(); renderPulse(); renderEvidenceChain(); renderGisText(); applyGisFilters(); }
+
+function switchView(view) { $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === view)); $$('.view').forEach((s) => s.classList.toggle('active', s.id === `view-${view}`)); $('#app-shell').classList.remove('menu-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+/* ---------- Wiring ---------- */
+
+function setup() {
+  $$('.nav-item').forEach((b) => b.addEventListener('click', () => switchView(b.dataset.view)));
+  $('#language-button').addEventListener('click', () => { state.language = isAr() ? 'en' : 'ar'; applyLanguage(); });
+  $('#menu-button').addEventListener('click', () => $('#app-shell').classList.toggle('menu-open'));
+  $('#refresh-button').addEventListener('click', () => { $('#updated-time').textContent = new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }); toast(tx('refreshed')); });
+  $('#density-button').addEventListener('click', () => { state.compact = !state.compact; $('#app-shell').classList.toggle('compact', state.compact); toast(tx(state.compact ? 'compactOn' : 'compactOff')); });
+  $('#notifications').addEventListener('click', () => toast(tx('notify')));
+  ['#safeguard-button', '#boundary-button', '#more-button'].forEach((s) => $(s).addEventListener('click', () => toast(tx('guardrail'))));
+  $('#view-all-button').addEventListener('click', () => switchView('exceptions'));
+  const topException = [...pack.exceptions].sort((a, b) => ['critical', 'high', 'watch'].indexOf(a.severity) - ['critical', 'high', 'watch'].indexOf(b.severity))[0];
+  $('#open-brief-button').addEventListener('click', () => openDecision(topException?.kpiId ?? 'availability'));
+  $('#evidence-button').addEventListener('click', () => openDecision('availability'));
+  $('#drawer-close').addEventListener('click', closeDrawer);
+  $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target === $('#drawer-backdrop')) closeDrawer(); });
+  $('#search-trigger').addEventListener('click', () => { switchView('agents'); setTimeout(() => $('#agent-input').focus(), 260); });
+  document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); switchView('agents'); setTimeout(() => $('#agent-input').focus(), 260); } if (e.key === 'Escape') closeDrawer(); });
+  $$('[data-question]').forEach((b) => b.addEventListener('click', () => { answer(b.dataset.question); answer(b.dataset.question, '#agent-answer'); $('#agent-status').classList.add('ready'); $('#agent-status b').textContent = tx('analysisReady'); }));
+  $('#agent-run').addEventListener('click', () => {
+    if (!$('#agent-input').value.trim()) { toast(isAr() ? 'اكتب سؤالاً أو اختر اقتراحاً أولاً.' : 'Write a question or choose a suggestion first.'); return; }
+    const s = $('#agent-status'); s.classList.add('working'); s.querySelector('b').textContent = tx('working');
+    setTimeout(() => { s.classList.remove('working'); s.classList.add('ready'); s.querySelector('b').textContent = tx('analysisReady'); answer('attention', '#agent-answer'); }, 620);
   });
 }
 
+function setupTelemetryControls() {
+  $('#telemetry-toggle').addEventListener('click', () => { if (state.telemetry.active) pauseTelemetry(); else startTelemetry({ immediate: true }); });
+  $('#telemetry-reset').addEventListener('click', () => resetTelemetry());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) window.clearInterval(state.telemetry.timer); else if (state.telemetry.active) startTelemetry(); });
+}
+
 function setupGisControls() {
-  $$('[data-gis-layer]').forEach((input) => input.addEventListener('change', () => {
-    state.gis.layers[input.dataset.gisLayer] = input.checked;
-    applyGisFilters();
-    if (state.gis.selected && $(`[data-gis-node="${state.gis.selected}"]`)?.classList.contains('gis-item--hidden')) closeGisInspector();
-  }));
-  $$('.gis-filter').forEach((button) => button.addEventListener('click', () => {
-    state.gis.filter = button.dataset.gisFilter;
-    applyGisFilters();
-  }));
-  $('#gis-clear-filter').addEventListener('click', () => {
-    state.gis.filter = 'all';
-    $$('[data-gis-layer]').forEach((input) => { input.checked = true; state.gis.layers[input.dataset.gisLayer] = true; });
-    applyGisFilters();
-    toast(state.language === 'ar' ? 'تمت استعادة جميع طبقات محاكاة GIS.' : 'All GIS simulation layers restored.');
-  });
+  $$('[data-gis-layer]').forEach((input) => input.addEventListener('change', () => { state.gis.layers[input.dataset.gisLayer] = input.checked; applyGisFilters(); }));
+  $$('.gis-filter').forEach((button) => button.addEventListener('click', () => { state.gis.filter = button.dataset.gisFilter; applyGisFilters(); }));
+  $('#gis-clear-filter').addEventListener('click', () => { state.gis.filter = 'all'; $$('[data-gis-layer]').forEach((input) => { input.checked = true; state.gis.layers[input.dataset.gisLayer] = true; }); applyGisFilters(); toast(isAr() ? 'تمت استعادة جميع طبقات محاكاة GIS.' : 'All GIS simulation layers restored.'); });
   $$('[data-gis-node]').forEach((item) => {
     item.addEventListener('click', () => openGisInspector(item.dataset.gisNode));
     item.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openGisInspector(item.dataset.gisNode); } });
   });
   $('#gis-close-inspector').addEventListener('click', closeGisInspector);
-  $('#gis-open-decision').addEventListener('click', () => openDecision($('#gis-open-decision').dataset.decision || 'DEC-042'));
-  $('#gis-zoom-in').addEventListener('click', () => setGisZoom(state.gis.zoom + .08));
-  $('#gis-zoom-out').addEventListener('click', () => setGisZoom(state.gis.zoom - .08));
+  $('#gis-open-decision').addEventListener('click', () => openDecision($('#gis-open-decision').dataset.decision || 'mttr'));
+  $('#gis-zoom-in').addEventListener('click', () => setGisZoom(state.gis.zoom + 0.08));
+  $('#gis-zoom-out').addEventListener('click', () => setGisZoom(state.gis.zoom - 0.08));
   $('#gis-fit-network').addEventListener('click', () => setGisZoom(1));
 }
 
+captureArabicBaseline();
 renderAll();
 renderTelemetry();
 setup();
 setupTelemetryControls();
 setupGisControls();
-startTelemetry({ immediate: true });
-setTimeout(()=>$('#loading-wash').classList.add('hide'),560);
+startTelemetry();
+setTimeout(() => $('#loading-wash').classList.add('hide'), 560);
