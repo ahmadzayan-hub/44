@@ -13,6 +13,10 @@ const scriptMatch = html.match(/<script>\n([\s\S]*?)\n<\/script>/);
 assert.ok(cellsMatch?.[1], 'Embedded aggregate cells are missing.');
 assert.ok(metaMatch?.[1], 'Forecast metadata is missing.');
 assert.ok(scriptMatch?.[1], 'Embedded dashboard script is missing.');
+assert.match(html, /id="forecast-scenario-controls"/, 'Scenario selector is missing.');
+assert.match(html, /data-forecast-scenario/, 'Scenario selector interactions are missing.');
+assert.match(html, /data-forecast-area/, 'Business-area scenario interactions are missing.');
+assert.match(html, /function renderForecastDetail/, 'Scenario detail renderer is missing.');
 new Function(scriptMatch[1]);
 
 const cells = JSON.parse(cellsMatch[1]);
