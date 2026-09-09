@@ -18,6 +18,10 @@ The browser preview has no external runtime dependency and uses synthetic data.
 
 Run an OpenAI-compatible local inference endpoint using an open-source runtime such as llama.cpp or vLLM. Set `LLM_BASE_URL` and `LLM_MODEL`. The RailMind domain layer does not import a proprietary model SDK.
 
+## Modes
+
+`RAILMIND_MODE=demo` (default) runs the synthetic provider and the public demo identities. `RAILMIND_MODE=production` requires `RAILMIND_USERS`, `DATABASE_URL` and live adapters for every source; the server refuses to start when any is missing and never substitutes synthetic data. Only the Maximo read adapter exists today; contract-repository and condition-monitoring adapters are pending, so production mode cannot start yet by design.
+
 ## Containers
 
 `Dockerfile` builds a Node 22 image with production dependencies only (the optional `pg` driver included) and runs `server.mjs` directly; there is no build step because Node strips types at runtime. `infra/docker-compose.yml` starts PostgreSQL and the app with `DATABASE_URL` preset. Configure a model endpoint with `LLM_BASE_URL` (use `host.docker.internal` for a llama.cpp server on the host).

@@ -43,7 +43,14 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - Agent OS runtime (orchestrator): deterministic routing, risk escalation to the capability minimum, plan-scoped read-only tools, model access by data-classification policy, evidence verification, approval gate, hash-chained audit and structured decision memory (ADR-003)
 - executable capability handlers: data quality, maintenance KPI, exception analysis, monthly/quarterly/annual reporting (deterministic narrative, model narrative when policy allows) and executive briefing that consumes governed decision memory
 - contract context port serving approved KPI definition sets (demo set in P0)
-- bearer-token authentication with hashed tokens and role-based permissions (viewer, engineer, manager, contract-owner, admin); the audit actor is always the authenticated principal; demo identities only when no users are configured
+- hardened HTTP runtime: explicit public allowlist, traversal and null-byte rejection, GET and HEAD only for static files, CSP and security headers, live security tests
+- data providers with provenance on every record; synthetic demo provider; fail-closed production providers; synthetic and production data can never mix
+- deterministic readiness gate (READY, PROVISIONAL, BLOCKED per KPI); BLOCKED KPIs are never decision-grade
+- Control Tower DTO built by an application service through providers, gate, KPI engine and exception engine; the browser renders it and calculates nothing
+- bearer-token authentication with hashed tokens, seven roles with capability-group permissions and scopes (system, line, asset group, contract, portfolio, business area) enforced on the server; the audit actor is always the authenticated principal; demo identities only when no users are configured
+- evidence-bound approval state machine (draft, under review, approved, rejected, superseded, locked) with automatic invalidation when evidence changes
+- append-only decision ledger (recommendation, decision, review, approval, rejection, supersession, outcome, corrective action, report release) with lineage and trace to source records, persisted in PostgreSQL
+- KPI authority registry: governed, versioned definitions with validity windows, owners, reviewers, inclusion and exclusion rules, evidence rules and approval status; production admits approved definitions only
 - asset intelligence migrated from the legacy RailMind product: health index, failure-risk score with named drivers, recommendation, engineer-review gate and Maximo work-order proposals that RailMind never submits itself
 - condition-monitoring port (in-memory demo profiles) feeding the asset-intelligence agent alongside Maximo
 - local decision API: governed agent runs, report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate, asset intelligence and agent workspace are interactive
@@ -81,8 +88,11 @@ The browser layer owns bilingual labels and layout only. If a number on screen i
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/api/health` | service status and active persistence mode |
-| GET | `/api/report` | current report package, readiness (next transitions and blockers) and its audit trail |
-| POST | `/api/report/transition` | `{ type, actorId, actorRole?, note?, at? }` with `type` one of `submit_for_review`, `approve`, `reject`, `lock`; refused transitions return 409 with blockers and are audited |
+| GET | `/api/report` | current report package, readiness (next transitions, blockers, approval validity), evidence version, audit trail and ledger entries; supersedes a stale approval automatically |
+| GET | `/api/control-tower` | Control Tower DTO (KPIs with readiness, exceptions, assets, evidence, freshness, report status, replay timeline); `?asOf=` replays period-to-date through the pipeline |
+| POST | `/api/report/transition` | `{ type, note?, at? }` with `type` one of `submit_for_review`, `approve`, `reject`, `lock`, `supersede`, `revise`; actor comes from the token; refused transitions return 409 with blockers and are audited |
+| GET | `/api/ledger` | decision ledger records (`?subjectType=&subjectId=` to filter) |
+| GET | `/api/ledger/{id}/trace` | lineage, successors, supersededBy and source evidence of a ledger record |
 | POST | `/api/report/reset` | `{ actorId }` restores the demo package; audited |
 | POST | `/api/agent/task` | `{ capability, actorId, goal, riskClass, actionMode }` routes through the kernel without executing; audited |
 | POST | `/api/agent/run` | same body plus optional `context` scope; executes the capability through the orchestrator and returns the run record with grounded output, tool calls, model use, approval requirement and audit sequences |
@@ -94,15 +104,23 @@ The browser layer owns bilingual labels and layout only. If a number on screen i
 
 Every route except `/api/health` and `/api/auth/demo-identities` requires `Authorization: Bearer <token>`. Tokens are resolved by a directory that stores SHA-256 hashes only. The audit trail records the authenticated principal id and role; actor fields in request bodies are ignored.
 
-| Role | Adds |
+| Role | Permissions |
 |---|---|
-| viewer | read report, audit, runs, agents |
-| engineer | plan and run agents, submit a report for review |
-| manager | approve or reject a report |
-| contract-owner | lock a report period |
-| admin | reset the demo package |
+| viewer | read report, control tower, audit, ledger, runs, agents |
+| maintenance_engineer | read, plan, run maintenance and asset capabilities, submit and revise a report |
+| reliability_engineer | read, plan, run asset and maintenance capabilities |
+| contract_manager | read, plan, run contract and maintenance capabilities, submit and revise a report |
+| finance_reviewer | read, plan, run finance capabilities |
+| approver | read, approve, reject, supersede and lock a report |
+| administrator | everything, plus reset of the demo package |
 
-Without `RAILMIND_USERS` the server runs in **demo mode** with public demo tokens (`demo-viewer`, `demo-engineer`, `demo-manager`, `demo-owner`, `demo-admin`) for the synthetic preview. Setting `RAILMIND_USERS` (JSON array of `principalId`, `displayName`, `role`, `tokenSha256`) disables demo tokens; generate a hash with `node --experimental-strip-types scripts/hash-token.mjs <token>`. Enterprise SSO (OIDC or Keycloak) can replace the directory behind the same `TokenDirectory` interface. The OpenAPI description is in `docs/openapi.yaml`.
+Every principal carries scopes (`system`, `line`, `asset_group`, `contract`, `portfolio`, `business_area`). Report, control tower, transition, plan and run routes check both the permission and the scope of the target contract; denials are audited.
+
+Without `RAILMIND_USERS` the server runs in **demo mode** with public demo tokens (`demo-viewer`, `demo-engineer`, `demo-reliability`, `demo-contract`, `demo-finance`, `demo-approver`, `demo-admin`, and `demo-other-contract` for cross-scope tests). Setting `RAILMIND_USERS` (JSON array of `principalId`, `displayName`, `role`, `scopes`, `tokenSha256`) disables demo tokens; generate a hash with `node --experimental-strip-types scripts/hash-token.mjs <token>`. Enterprise SSO (OIDC or Keycloak) can replace the directory behind the same `TokenDirectory` interface. The OpenAPI description is in `docs/openapi.yaml`.
+
+### Data modes and readiness
+
+`RAILMIND_MODE=demo` (default) serves synthetic records with provenance through the same pipeline production will use. `RAILMIND_MODE=production` requires live adapters for Maximo, the contract repository and condition monitoring and refuses to start otherwise; there is no fallback to synthetic data. Every KPI carries a readiness state from the deterministic gate: READY, PROVISIONAL (usable with visible caveats) or BLOCKED (never decision-grade, excluded from contractual exceptions and narrative facts). Demo KPI definitions are `demo_only` and can never be admitted in production.
 
 ### Configuration
 
@@ -118,7 +136,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 ### Persistence
 
-Without `DATABASE_URL` all state is in memory and resets on restart. With `DATABASE_URL` set, the server uses the PostgreSQL adapters in `src/persistence/postgres.ts` through the optional `pg` driver and creates the schema from `infra/sql/001_railmind_core.sql` on start. Audit rows are protected by a database trigger that rejects `UPDATE` and `DELETE`.
+Without `DATABASE_URL` all state is in memory and resets on restart. With `DATABASE_URL` set, the server uses the PostgreSQL adapters in `src/persistence/postgres.ts` through the optional `pg` driver and creates the schema from `infra/sql/001_railmind_core.sql` on start. Audit and ledger rows are protected by database triggers that reject `UPDATE` and `DELETE`; report state, memory, approvals and ledger entries survive restarts.
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d
@@ -163,6 +181,9 @@ Maximo / Finance / Contracts / Condition feeds
 - `docs/MIGRATION_FROM_RAILMIND.md`
 - `docs/ADR-002_PLATFORM_SCOPE.md`
 - `docs/ADR-003_AGENT_RUNTIME.md`
+- `docs/RECONCILIATION_2026-09-09.md`
+- `docs/IMPLEMENTATION_PLAN_P0.md`
+- `docs/BRANCH_GOVERNANCE.md`
 - `docs/openapi.yaml`
 - `docs/UX_REVIEW_2026-09-09.md`
 - `docs/CI_WORKFLOW_TEMPLATE.yml`

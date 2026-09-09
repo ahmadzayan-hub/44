@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RailMind Agent OS decision API
-  version: 0.4.0
+  version: 0.5.0
   description: >-
     Local decision API for the P0 synthetic demo. Mutates RailMind-owned state only
     (report status, audit trail, agent memory). Never writes to Maximo, finance or
@@ -41,21 +41,46 @@ paths:
       summary: Current report package, readiness and its audit trail
       responses:
         '200': { description: Report view }
+  /api/control-tower:
+    get:
+      summary: Control Tower DTO through providers, readiness gate, KPI engine and exception engine
+      parameters:
+        - in: query
+          name: asOf
+          schema: { type: string, format: date-time }
+          description: Period-to-date replay through the same pipeline
+      responses:
+        '200': { description: DTO }
+        '403': { description: Outside the principal's scope }
+  /api/ledger:
+    get:
+      summary: Decision ledger records
+      parameters:
+        - { in: query, name: subjectType, schema: { type: string } }
+        - { in: query, name: subjectId, schema: { type: string } }
+      responses:
+        '200': { description: Records }
+  /api/ledger/{ledgerId}/trace:
+    get:
+      summary: Lineage, successors, supersededBy and source evidence of a ledger record
+      parameters:
+        - { in: path, name: ledgerId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Trace }
+        '404': { description: Unknown record }
   /api/report/transition:
     post:
-      summary: Execute a report state-machine transition
+      summary: Execute a report state-machine transition (actor taken from the token)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [type, actorId]
+              required: [type]
               properties:
-                type: { type: string, enum: [submit_for_review, approve, reject, lock] }
-                actorId: { type: string }
-                actorRole: { type: string }
-                note: { type: string, description: Required to approve with a critical exception or to reject }
+                type: { type: string, enum: [submit_for_review, approve, reject, lock, supersede, revise] }
+                note: { type: string, description: Required to approve with a critical exception, to reject, and recorded as the supersession reason }
                 at: { type: string, format: date-time }
       responses:
         '200': { description: Transition applied and audited }
@@ -80,10 +105,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [capability, actorId, goal, riskClass, actionMode]
+              required: [capability, goal, riskClass, actionMode]
               properties:
                 capability: { type: string }
-                actorId: { type: string }
                 goal: { type: string }
                 riskClass: { type: string, enum: [routine, operational, contractual, financial, safety_critical] }
                 actionMode: { type: string, enum: [read, analyse, draft, propose_write, execute_write, control] }
