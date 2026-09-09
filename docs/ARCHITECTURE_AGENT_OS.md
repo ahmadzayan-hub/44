@@ -70,7 +70,7 @@ Owns recommendations, named human reviews, approvals/rejections, decision ration
 
 ## 4. Agent OS kernel
 
-The Agent OS is a governed orchestration layer, not a collection of uncontrolled chatbots.
+The Agent OS is a governed orchestration layer, not a collection of uncontrolled chatbots. The runtime that implements the flow below is described in ADR-003 (`src/agent-os/orchestrator.ts`).
 
 ```text
 Task intake

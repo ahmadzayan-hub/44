@@ -1,4 +1,4 @@
-import type { EvidenceRef } from '../agent-os/contracts.ts';
+import type { EvidenceRef, HumanApproval } from '../agent-os/contracts.ts';
 
 export type ReportCadence = 'monthly' | 'quarterly' | 'annual';
 
@@ -19,6 +19,10 @@ export interface KpiObservation {
   value: number;
   status: 'within_target' | 'watch' | 'breach' | 'not_applicable';
   evidence: readonly EvidenceRef[];
+  /** Readiness from the data-quality gate. Absent means not evaluated (legacy callers). */
+  readiness?: { state: 'READY' | 'PROVISIONAL' | 'BLOCKED'; reasons: readonly string[] };
+  /** True only when readiness is READY or PROVISIONAL; BLOCKED observations are never decision-grade. */
+  decisionGrade?: boolean;
 }
 
 export interface ReportException {
@@ -40,5 +44,24 @@ export interface ReportPackage {
   exceptions: readonly ReportException[];
   /** AI may draft narrative only after KPI observations have been approved. */
   narrativeDraft?: string;
-  status: 'draft' | 'under_review' | 'approved' | 'locked';
+  status: ReportStatus;
+  /** Set when the package is submitted for named review. */
+  reviewRequestedAt?: string;
+  /** Named human decision recorded at approval or rejection, bound to the evidence it was given for. */
+  approval?: ReportApproval;
+  /** Set when the approved package is locked for the period. */
+  lockedAt?: string;
+  /** Fingerprint of the KPI values, formula versions and evidence the package currently carries. */
+  evidenceVersion?: string;
+  /** Why and when the package was superseded; the package then needs revision. */
+  supersession?: { at: string; reason: string; previousEvidenceVersion: string; actorId: string };
 }
+
+export interface ReportApproval extends HumanApproval {
+  /** Evidence version the reviewer saw when deciding. */
+  evidenceVersion: string;
+  /** KPI id to formula version at decision time. */
+  formulaVersions: Readonly<Record<string, string>>;
+}
+
+export type ReportStatus = 'draft' | 'under_review' | 'approved' | 'rejected' | 'superseded' | 'locked';

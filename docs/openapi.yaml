@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: RailMind Agent OS decision API
+  version: 0.5.0
+  description: >-
+    Local decision API for the P0 synthetic demo. Mutates RailMind-owned state only
+    (report status, audit trail, agent memory). Never writes to Maximo, finance or
+    contract systems. All routes except /api/health and /api/auth/demo-identities require
+    a bearer token; the audit actor is the authenticated principal.
+servers:
+  - url: http://localhost:4173
+security:
+  - bearer: []
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+paths:
+  /api/health:
+    get:
+      summary: Service status, persistence mode, dependency probe and available capabilities
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Dependency probe failed }
+  /api/auth/demo-identities:
+    get:
+      security: []
+      summary: Demo identities and their public tokens (demo mode only)
+      responses:
+        '200': { description: Identities }
+        '404': { description: Not available in token mode }
+  /api/auth/me:
+    get:
+      summary: The authenticated principal and its permissions
+      responses:
+        '200': { description: Principal }
+        '401': { description: Missing or invalid token }
+  /api/report:
+    get:
+      summary: Current report package, readiness and its audit trail
+      responses:
+        '200': { description: Report view }
+  /api/control-tower:
+    get:
+      summary: Control Tower DTO through providers, readiness gate, KPI engine and exception engine
+      parameters:
+        - in: query
+          name: asOf
+          schema: { type: string, format: date-time }
+          description: Period-to-date replay through the same pipeline
+      responses:
+        '200': { description: DTO }
+        '403': { description: Outside the principal's scope }
+  /api/ledger:
+    get:
+      summary: Decision ledger records
+      parameters:
+        - { in: query, name: subjectType, schema: { type: string } }
+        - { in: query, name: subjectId, schema: { type: string } }
+      responses:
+        '200': { description: Records }
+  /api/ledger/{ledgerId}/trace:
+    get:
+      summary: Lineage, successors, supersededBy and source evidence of a ledger record
+      parameters:
+        - { in: path, name: ledgerId, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Trace }
+        '404': { description: Unknown record }
+  /api/report/transition:
+    post:
+      summary: Execute a report state-machine transition (actor taken from the token)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type: { type: string, enum: [submit_for_review, approve, reject, lock, supersede, revise] }
+                note: { type: string, description: Required to approve with a critical exception, to reject, and recorded as the supersession reason }
+                at: { type: string, format: date-time }
+      responses:
+        '200': { description: Transition applied and audited }
+        '409': { description: Transition refused; blockers returned and refusal audited }
+  /api/report/reset:
+    post:
+      summary: Restore the demo package (audited)
+      responses:
+        '200': { description: Restored }
+  /api/agent/task:
+    post:
+      summary: Plan a task through the kernel without executing it (audited)
+      responses:
+        '200': { description: Plan }
+        '403': { description: Blocked by routing or policy }
+  /api/agent/run:
+    post:
+      summary: Execute a governed agent run through the orchestrator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capability, goal, riskClass, actionMode]
+              properties:
+                capability: { type: string }
+                goal: { type: string }
+                riskClass: { type: string, enum: [routine, operational, contractual, financial, safety_critical] }
+                actionMode: { type: string, enum: [read, analyse, draft, propose_write, execute_write, control] }
+                context:
+                  type: object
+                  description: Optional analysis scope (contractId, periodStart, periodEnd, priorBreachesByKpi)
+      responses:
+        '200': { description: Completed run record with grounded output }
+        '403': { description: Blocked by routing or policy }
+        '422': { description: Run failed (tool boundary, missing evidence, handler error) }
+  /api/runs:
+    get:
+      summary: Run records of this process
+      responses:
+        '200': { description: Runs }
+  /api/audit:
+    get:
+      summary: All audit events with hash-chain verification
+      responses:
+        '200': { description: Events and chain status }
+  /api/agents:
+    get:
+      summary: Registered agent catalog
+      responses:
+        '200': { description: Catalog }

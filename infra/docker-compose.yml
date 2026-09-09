@@ -1,3 +1,4 @@
+# Local stack: PostgreSQL (with pgvector) and the RailMind app. Synthetic data only.
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -9,5 +10,27 @@ services:
       - "5432:5432"
     volumes:
       - railmind_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U railmind -d railmind"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      PORT: "4173"
+      DATABASE_URL: postgres://railmind:local_only_change_me@postgres:5432/railmind
+      DATA_CLASSIFICATION: synthetic
+      # LLM_BASE_URL: http://host.docker.internal:8080/v1
+      # LLM_MODEL: Qwen3-8B
+    ports:
+      - "4173:4173"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   railmind_pg:

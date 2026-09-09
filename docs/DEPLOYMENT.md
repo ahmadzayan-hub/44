@@ -18,6 +18,18 @@ The browser preview has no external runtime dependency and uses synthetic data.
 
 Run an OpenAI-compatible local inference endpoint using an open-source runtime such as llama.cpp or vLLM. Set `LLM_BASE_URL` and `LLM_MODEL`. The RailMind domain layer does not import a proprietary model SDK.
 
+## Modes
+
+`RAILMIND_MODE=demo` (default) runs the synthetic provider and the public demo identities. `RAILMIND_MODE=production` requires `RAILMIND_USERS`, `DATABASE_URL` and live adapters for every source; the server refuses to start when any is missing and never substitutes synthetic data. Only the Maximo read adapter exists today; contract-repository and condition-monitoring adapters are pending, so production mode cannot start yet by design.
+
+## Containers
+
+`Dockerfile` builds a Node 22 image with production dependencies only (the optional `pg` driver included) and runs `server.mjs` directly; there is no build step because Node strips types at runtime. `infra/docker-compose.yml` starts PostgreSQL and the app with `DATABASE_URL` preset. Configure a model endpoint with `LLM_BASE_URL` (use `host.docker.internal` for a llama.cpp server on the host).
+
 ## Database
 
-For a local governed memory store, `infra/docker-compose.yml` starts PostgreSQL with pgvector. This is optional for the static P0 demo.
+`infra/docker-compose.yml` starts PostgreSQL 16 with pgvector. It is optional for the static preview. When `DATABASE_URL` is set, `server.mjs` switches the audit log, memory store and report state to the PostgreSQL adapters and applies `infra/sql/001_railmind_core.sql` on start. The optional `pg` driver is installed by `npm ci`; without it the server reports a clear error instead of falling back silently.
+
+Audit rows are append-only at database level (trigger on `railmind_audit_events`). Appends are serialised with a transaction-scoped advisory lock so the hash chain stays linear under concurrent writers.
+
+The static preview works without the API (GitHub Pages or any static host): the approval gate then renders read-only from the generated data pack and says so.

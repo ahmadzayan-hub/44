@@ -2,8 +2,16 @@ import type {
   AgentDefinition,
   AgentExecutionPlan,
   AgentTask,
+  RiskClass,
 } from './contracts.ts';
 import { evaluateExecutionPolicy } from './policy.ts';
+
+const RISK_ORDER: readonly RiskClass[] = ['routine', 'operational', 'contractual', 'financial', 'safety_critical'];
+
+/** Returns the higher of two risk classes. */
+export function escalateRisk(a: RiskClass, b: RiskClass): RiskClass {
+  return RISK_ORDER.indexOf(a) >= RISK_ORDER.indexOf(b) ? a : b;
+}
 
 export type PlanningResult =
   | { ok: true; plan: AgentExecutionPlan }
@@ -35,7 +43,10 @@ export function createExecutionPlan(
     };
   }
 
-  const policy = evaluateExecutionPolicy(task);
+  const minimum = agent.minimumRiskClass?.[task.capability];
+  const effectiveTask: AgentTask = minimum ? { ...task, riskClass: escalateRisk(task.riskClass, minimum) } : task;
+
+  const policy = evaluateExecutionPolicy(effectiveTask);
   if (!policy.allowed) {
     return { ok: false, reason: 'policy_blocked', detail: policy.reason };
   }
@@ -43,7 +54,7 @@ export function createExecutionPlan(
   return {
     ok: true,
     plan: {
-      task,
+      task: effectiveTask,
       agent,
       policy,
       toolIds: agent.allowedToolIds,
