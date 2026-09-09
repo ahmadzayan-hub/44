@@ -2,6 +2,7 @@ const state = {
   language: 'ar', compact: false,
   telemetry: { active: true, ticks: 0, timer: null, eventId: 0, lastSignalAt: null, lastSignalLabel: null },
   gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true, trains: true }, selected: null, eventLabel: null, train: { cycle: 0, active: 'train-r01', lastEvent: null } },
+  predictive: { lastUpdatedAt: null, alerts: [] },
   kpis: [
     { value: '98.522', base: 98.522, unit: '%', precision: 3, status: 'high', ar: 'التوافر التشغيلي', en: 'Operational availability', arTrend: 'أقل من النطاق التجريبي', enTrend: 'Below demo target', target: '≥ 99.5%' },
     { value: '04', base: 4, unit: '', precision: 0, status: 'good', ar: 'حالات العطل', en: 'Failure count', arTrend: 'ضمن الحد التجريبي', enTrend: 'At demo target', target: '≤ 4' },
@@ -143,7 +144,7 @@ function setGisZoom(nextZoom) {
   $('#gis-map-viewport').style.setProperty('--gis-zoom', String(state.gis.zoom));
 }
 
-function renderAll(){renderKpis();renderDecisions();renderExceptionTable();renderAssets();renderContract();renderReports();renderAgents();renderGisText();applyGisFilters();}
+function renderAll(){renderKpis();renderPredictiveAlerts();renderDecisions();renderExceptionTable();renderAssets();renderContract();renderReports();renderAgents();renderGisText();applyGisFilters();}
 
 const telemetrySignals = [
   { asset: 'ATC-ZC-02', ar: 'نبضة صحة التحكم الآلي', en: 'ATC health pulse' },
@@ -157,6 +158,55 @@ const trainSimulation = [
   { id: 'train-r02', code: 'R02', ar: 'R02 في نقطة متابعة توضيحية', en: 'R02 at an illustrative watch point' },
   { id: 'train-r03', code: 'R03', ar: 'R03 يحافظ على تباعد محاكاة محلي', en: 'R03 maintaining local simulated separation' },
 ];
+
+
+const predictiveCopy = {
+  ar: {
+    kicker: 'صيانة استباقية · نموذج محلي', title: 'إشارات الصيانة الاستباقية', description: 'شاشة مخاطر حتمية مرتبطة بسلسلة TLM المحلية وحركة القطارات التوضيحية. لا تمثل تشخيصاً أو إنذاراً حياً.', count: 'إشارات تتطلب مراجعة', model: 'PDM · LOCAL', stream: 'متصل بمحاكاة TLM', boundary: '⌑ هذه إشارات توضيحية محلية للقراءة والمراجعة فقط. لا يتم إنشاء أمر عمل أو تنفيذ أي إجراء تشغيلي تلقائياً.', score: 'درجة الإشارة', driver: 'محرك التحديث', route: 'افتح في الخريطة', source: 'المصدر', review: 'مراجعة بشرية', action: 'إجراء مقترح', status: { critical: 'حرج', high: 'مرتفع', watch: 'متابعة', good: 'مستقر' }
+  },
+  en: {
+    kicker: 'PREDICTIVE MAINTENANCE · LOCAL MODEL', title: 'Predictive maintenance signals', description: 'A deterministic risk display linked to the local TLM sequence and illustrative train movement. It is not a live diagnosis or alarm.', count: 'signals require review', model: 'PDM · LOCAL', stream: 'Synced to TLM simulation', boundary: '⌑ Local illustrative signals for read and review only. No work order is created and no operational action is executed automatically.', score: 'Signal score', driver: 'Update driver', route: 'Open in map', source: 'Source', review: 'Human review', action: 'Proposed action', status: { critical: 'Critical', high: 'High', watch: 'Watch', good: 'Stable' }
+  }
+};
+
+const predictiveRules = [
+  { id: 'PDM-ATC-01', node: 'atc', base: 54, signalAsset: 'ATC-ZC-01', signalBoost: 22, arTitle: 'مراقبة دورة تحكم ATC', enTitle: 'ATC control-cycle watch', arAsset: 'ATC-ZC-01 · تحكم آلي', enAsset: 'ATC-ZC-01 · Automatic train control', arAction: 'تحقق من اتجاه دورة الصيانة في العرض قبل طلب مراجعة بشرية.', enAction: 'Review the illustrative maintenance-cycle trend before requesting human review.', decision: 'DEC-043' },
+  { id: 'PDM-R02-01', node: 'train-r02', base: 52, trainId: 'train-r02', trainBoost: 25, arTitle: 'نمط حركة توضيحي للقطار R02', enTitle: 'Illustrative R02 movement pattern', arAsset: 'R02 · حركة قطار محاكاة', enAsset: 'R02 · Simulated train movement', arAction: 'افتح سياق القطار والدليل المرتبط قبل أي تقييم.', enAction: 'Open the train context and linked evidence before any assessment.', decision: 'DEC-042' },
+  { id: 'PDM-SIG-14', node: 'signal', base: 39, signalAsset: 'MAXIMO-DEMO', signalBoost: 18, arTitle: 'اتجاه فحص الإشارات', enTitle: 'Signalling inspection trend', arAsset: 'SIG-CB-14 · إشارات', enAsset: 'SIG-CB-14 · Signalling', arAction: 'راقب الإشارة في السلسلة المحلية التالية؛ لا يلزم إجراء تشغيلي.', enAction: 'Observe the signal in the next local cycle; no operational action is required.', decision: 'DEC-044' }
+];
+
+function calculatePredictiveAlerts() {
+  const nextSignal = telemetrySignals[state.telemetry.ticks % telemetrySignals.length];
+  const activeTrain = state.gis.train.active;
+  const phase = [-3, 0, 3, 1, -1];
+  return predictiveRules.map((rule, index) => {
+    const signalMatch = nextSignal?.asset === rule.signalAsset;
+    const trainMatch = activeTrain === rule.trainId;
+    const score = Math.max(20, Math.min(94, rule.base + (signalMatch ? rule.signalBoost : 0) + (trainMatch ? rule.trainBoost : 0) + phase[(state.telemetry.ticks + index * 2) % phase.length]));
+    const severity = score >= 80 ? 'critical' : score >= 65 ? 'high' : score >= 45 ? 'watch' : 'good';
+    return { ...rule, score, severity, driver: trainMatch ? (state.language === 'ar' ? 'دورة حركة R02 المحلية' : 'Local R02 movement cycle') : signalMatch ? `${tx('telemetryEventPrefix')} · ${nextSignal.asset}` : (state.language === 'ar' ? 'نمط محاكاة حتمي' : 'Deterministic simulation pattern'), source: `${tx('telemetryEventPrefix')}-${String(state.telemetry.eventId).padStart(3, '0')} · ${nextSignal?.asset || 'BASELINE'}` };
+  });
+}
+
+function renderPredictiveAlerts() {
+  const root = $('#predictive-alert-list');
+  if (!root) return;
+  const copy = predictiveCopy[state.language];
+  const alerts = calculatePredictiveAlerts();
+  state.predictive.alerts = alerts;
+  const attention = alerts.filter((alert) => alert.severity !== 'good').length;
+  $('#predictive-kicker').textContent = copy.kicker;
+  $('#predictive-title').textContent = copy.title;
+  $('#predictive-description').textContent = copy.description;
+  $('#predictive-count').textContent = String(attention).padStart(2, '0');
+  $('#predictive-count-label').textContent = copy.count;
+  $('#predictive-model-state').textContent = copy.model;
+  $('#predictive-stream-label').textContent = copy.stream;
+  $('#predictive-stream-detail').textContent = alerts[0]?.source || 'TLM-000 · BASELINE';
+  $('#predictive-boundary').textContent = copy.boundary;
+  root.innerHTML = alerts.map((alert) => `<article class="predictive-alert predictive-alert--${alert.severity}" data-predictive-alert="${alert.id}"><div class="predictive-alert__head"><span class="predictive-alert__icon">✦</span><div><div class="predictive-alert__title"><b>${state.language === 'ar' ? alert.arTitle : alert.enTitle}</b><span class="predictive-alert__status">${copy.status[alert.severity]}</span></div><small dir="ltr">${state.language === 'ar' ? alert.arAsset : alert.enAsset}</small></div><div class="predictive-alert__score"><strong>${alert.score}<small>/100</small></strong><span>${copy.score}</span></div></div><div class="predictive-alert__details"><div><small>${copy.driver}</small><b>${alert.driver}</b></div><div><small>${copy.action}</small><b>${state.language === 'ar' ? alert.arAction : alert.enAction}</b></div></div><div class="predictive-alert__footer"><span>⌁ <small>${copy.source}</small> <b dir="ltr">${alert.source}</b></span><button type="button" data-predictive-node="${alert.node}" data-decision="${alert.decision}">${copy.route} <i>↗</i></button></div></article>`).join('');
+  $$('[data-predictive-node]').forEach((button) => button.addEventListener('click', () => { switchView('network'); openGisInspector(button.dataset.predictiveNode); window.setTimeout(() => $('#gis-inspector')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120); }));
+}
 
 function advanceTrainSimulation() {
   const train = state.gis.train;
@@ -207,6 +257,7 @@ function emitTelemetry({ announce = false } = {}) {
   stream.lastSignalLabel = state.language === 'ar' ? signal.ar : signal.en;
   state.gis.eventLabel = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${state.language === 'ar' ? signal.ar : signal.en}`;
   advanceTrainSimulation();
+  renderPredictiveAlerts();
   renderTelemetry();
   renderGisStream();
   if (announce) toast(state.language === 'ar' ? 'تم تحديث مؤشرات المحاكاة محلياً.' : 'Local simulation indicators updated.');
@@ -237,6 +288,7 @@ function resetTelemetry() {
   state.gis.train.lastEvent = null;
   state.kpis.forEach((kpi) => { kpi.value = kpi.precision === 0 ? String(kpi.base).padStart(2, '0') : Number(kpi.base).toFixed(kpi.precision); });
   renderKpis();
+  renderPredictiveAlerts();
   $('#telemetry-event').textContent = 'TLM-000 · BASELINE';
   renderTelemetry();
   renderGisStream();
