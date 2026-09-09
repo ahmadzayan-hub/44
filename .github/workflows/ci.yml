@@ -28,6 +28,11 @@ jobs:
           PID=$!
           sleep 2
           curl --fail http://127.0.0.1:4173/api/health
-          curl --fail http://127.0.0.1:4173/api/report | grep -q '"status":"draft"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/api/report)" = "401"
+          curl --fail -H 'Authorization: Bearer demo-viewer' http://127.0.0.1:4173/api/report | grep -q '"status":"draft"'
+          curl --fail -H 'Authorization: Bearer demo-viewer' http://127.0.0.1:4173/api/control-tower | grep -q '"synthetic":true'
           curl --fail http://127.0.0.1:4173/ | grep -q 'RailMind Agent OS'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/package.json)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/.env)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/src/demo.ts)" = "404"
           kill $PID
