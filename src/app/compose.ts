@@ -17,6 +17,10 @@ import { OpenAiCompatibleGateway } from '../llm/openai-compatible.ts';
 import type { SqlDatabase } from '../persistence/sql.ts';
 import { InMemoryReportStore, type ReportStore } from '../reporting/store.ts';
 import type { ApiDependencies } from '../api/router.ts';
+import { ControlTowerService } from './control-tower-service.ts';
+import { assertConsistentMode, type DataProviders } from '../providers/contracts.ts';
+import { createContractRepositoryProvider, createMaximoReadProvider } from '../providers/production.ts';
+import { createSyntheticProviders } from '../providers/synthetic.ts';
 
 /**
  * Composition root. Builds every port and adapter from configuration so the
@@ -26,6 +30,8 @@ import type { ApiDependencies } from '../api/router.ts';
 export interface Application {
   api: ApiDependencies;
   runtime: AgentRuntime;
+  providers: DataProviders;
+  controlTower: ControlTowerService;
   close(): Promise<void>;
 }
 
@@ -59,12 +65,28 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
     reportStore = new InMemoryReportStore();
   }
 
-  const maximo: MaximoReadPort = overrides.maximo
-    ?? (config.maximo.baseUrl
-      ? new MaximoRestClient({ baseUrl: config.maximo.baseUrl, apiKey: config.maximo.apiKey, objectStructures: config.maximo.objectStructures })
-      : new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS, preventiveMaintenance: DEMO_PM_RECORDS }));
-  const contract = new InMemoryContractReadPort([DEMO_CONTRACT_KPI_SET]);
-  const condition = new InMemoryConditionReadPort(DEMO_CONDITION_PROFILES);
+  /*
+   * Provider selection. Demo mode uses the synthetic provider for everything.
+   * Production mode requires live adapters for every source and refuses to
+   * start otherwise: a missing source never falls back to synthetic data.
+   */
+  let providers: DataProviders;
+  let maximo: MaximoReadPort;
+  let contract;
+  let condition;
+  if (config.mode === 'production') {
+    const missing: string[] = [];
+    if (!config.maximo.baseUrl && !overrides.maximo) missing.push('MAXIMO_BASE_URL (Maximo read adapter)');
+    missing.push('contract repository adapter (not implemented; only the in-memory demo set exists)');
+    missing.push('condition-monitoring adapter (not implemented; only synthetic profiles exist)');
+    throw new Error(`RAILMIND_MODE=production cannot start: ${missing.join('; ')}. Synthetic fallback is refused in production.`);
+  }
+  maximo = overrides.maximo ?? new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS, preventiveMaintenance: DEMO_PM_RECORDS });
+  contract = new InMemoryContractReadPort([DEMO_CONTRACT_KPI_SET]);
+  condition = new InMemoryConditionReadPort(DEMO_CONDITION_PROFILES);
+  providers = createSyntheticProviders({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS, preventiveMaintenance: DEMO_PM_RECORDS, conditionProfiles: DEMO_CONDITION_PROFILES, kpiSets: [DEMO_CONTRACT_KPI_SET] });
+  assertConsistentMode(providers);
+  void createMaximoReadProvider; void createContractRepositoryProvider; void MaximoRestClient;
 
   const modelGateway: ModelGateway | null = overrides.modelGateway !== undefined
     ? overrides.modelGateway
@@ -81,9 +103,13 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
     now: overrides.now,
   });
 
+  const controlTower = new ControlTowerService(providers, reportStore, DEMO_REPORT, overrides.now);
+
   return {
-    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, tokenDirectory: createTokenDirectory(config.usersJson), healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined },
+    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, tokenDirectory: createTokenDirectory(config.usersJson), healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined, controlTower, scope: DEMO_SCOPE, mode: providers.mode },
     runtime,
+    providers,
+    controlTower,
     close,
   };
 }

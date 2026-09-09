@@ -19,6 +19,10 @@ export interface KpiObservation {
   value: number;
   status: 'within_target' | 'watch' | 'breach' | 'not_applicable';
   evidence: readonly EvidenceRef[];
+  /** Readiness from the data-quality gate. Absent means not evaluated (legacy callers). */
+  readiness?: { state: 'READY' | 'PROVISIONAL' | 'BLOCKED'; reasons: readonly string[] };
+  /** True only when readiness is READY or PROVISIONAL; BLOCKED observations are never decision-grade. */
+  decisionGrade?: boolean;
 }
 
 export interface ReportException {

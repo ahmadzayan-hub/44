@@ -3,6 +3,7 @@ import type { ActionMode, AgentTask, DataClassification, HumanApproval, RiskClas
 import { createExecutionPlan } from '../agent-os/kernel.ts';
 import type { MemoryStore } from '../agent-os/memory.ts';
 import type { AgentRuntime } from '../agent-os/orchestrator.ts';
+import type { ControlTowerService, TowerScope } from '../app/control-tower-service.ts';
 import { TRANSITION_PERMISSION, hasPermission, permissionsOf, type Permission, type Principal } from '../auth/principal.ts';
 import type { TokenDirectory } from '../auth/token-directory.ts';
 import { securityHeaders } from '../http/security-headers.ts';
@@ -36,6 +37,10 @@ export interface ApiDependencies {
   healthCheck?: () => Promise<void>;
   /** Bearer-token directory. Required: there is no unauthenticated mode. */
   tokenDirectory: TokenDirectory;
+  /** Control Tower application service and default scope. */
+  controlTower?: ControlTowerService;
+  scope?: TowerScope;
+  mode?: 'synthetic' | 'production';
 }
 
 /** Structural subset of Node's IncomingMessage/ServerResponse so src/ stays runtime-neutral. */
@@ -182,6 +187,7 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
   }
 
   async function route(method: string, path: string, req: ApiRequest): Promise<{ status: number; body: unknown }> {
+    const query = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
     if (method === 'GET' && path === '/api/auth/demo-identities') {
       if (deps.tokenDirectory.mode !== 'demo') throw new HttpError(404, 'Demo identities are not available in token mode.');
       return { status: 200, body: { mode: 'demo', identities: deps.tokenDirectory.demoIdentities().map((entry) => ({ ...entry.principal, token: entry.token, permissions: permissionsOf(entry.principal) })) } };
@@ -191,7 +197,7 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
       if (deps.healthCheck) {
         try { await deps.healthCheck(); dependency = 'ok'; } catch { dependency = 'failed'; }
       }
-      const body = { service: 'Project 44 RailMind Agent OS', status: dependency === 'failed' ? 'degraded' : 'ok', mode: 'p0-demo', persistence: deps.persistence, dependency, classification: deps.classification ?? 'synthetic', auth: deps.tokenDirectory.mode, capabilities: deps.runtime?.capabilities() ?? [] };
+      const body = { service: 'Project 44 RailMind Agent OS', status: dependency === 'failed' ? 'degraded' : 'ok', mode: 'p0-demo', dataMode: deps.mode ?? 'synthetic', persistence: deps.persistence, dependency, classification: deps.classification ?? 'synthetic', auth: deps.tokenDirectory.mode, capabilities: deps.runtime?.capabilities() ?? [] };
       return { status: dependency === 'failed' ? 503 : 200, body };
     }
 
@@ -216,6 +222,13 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
     if (method === 'GET' && path === '/api/report') {
       await require(principal, 'report.read', 'report');
       return { status: 200, body: await reportView() };
+    }
+    if (method === 'GET' && path === '/api/control-tower') {
+      await require(principal, 'report.read', 'control-tower');
+      if (!deps.controlTower || !deps.scope) throw new HttpError(503, 'Control Tower service is not configured.');
+      const asOf = query.get('asOf') ?? undefined;
+      if (asOf !== undefined && Number.isNaN(Date.parse(asOf))) throw new HttpError(400, 'asOf must be an ISO timestamp.');
+      return { status: 200, body: await deps.controlTower.build(deps.scope, asOf) };
     }
     if (method === 'GET' && path === '/api/audit') {
       await require(principal, 'audit.read', 'audit');

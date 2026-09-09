@@ -4,7 +4,9 @@ import type { ContractReadInput, MaximoReadInput } from '../agent-os/standard-to
 import type { ContractKpiSet } from '../connectors/contract/port.ts';
 import type { MaximoWorkOrderRecord } from '../connectors/maximo/port.ts';
 import { exceptionsFromKpis } from '../exceptions/engine.ts';
-import { computeKpiObservation } from '../kpi/engine.ts';
+import { computeGovernedKpis } from '../kpi/governed.ts';
+import type { ProvidedRecord } from '../providers/contracts.ts';
+import type { ReadinessAssessment } from '../readiness/gate.ts';
 import type { KpiObservation, ReportException } from '../reporting/contracts.ts';
 import { resolveScope, type AnalysisScope } from './scope.ts';
 
@@ -19,6 +21,7 @@ export interface KpiEvidencePack {
   workOrders: readonly MaximoWorkOrderRecord[];
   evidence: readonly EvidenceRef[];
   observations: readonly KpiObservation[];
+  readiness: ReadinessAssessment;
 }
 
 export async function gatherKpiEvidence(context: CapabilityContext, defaults: AnalysisScope): Promise<KpiEvidencePack> {
@@ -30,17 +33,11 @@ export async function gatherKpiEvidence(context: CapabilityContext, defaults: An
     const rows = await context.tools.call<MaximoReadInput, readonly MaximoWorkOrderRecord[]>('maximo.read', { kind: 'workOrders', assetId, since: scope.periodStart });
     workOrders.push(...rows);
   }
-  const evidence: EvidenceRef[] = [
-    kpiSet.evidence,
-    ...workOrders.map((wo) => ({ sourceSystem: 'maximo' as const, entityType: 'work-order', entityId: wo.workOrderId, observedAt: wo.reportedAt ?? scope.periodEnd })),
-  ];
-  const observations = kpiSet.definitions.map((definition) => computeKpiObservation(definition, {
-    periodStart: scope.periodStart,
-    periodEnd: scope.periodEnd,
-    plannedServiceMinutes: kpiSet.plannedServiceMinutesPerPeriod(scope.periodStart, scope.periodEnd),
-    workOrders,
-  }, evidence));
-  return { scope, definitionVersion: kpiSet.definitionVersion, workOrders, evidence, observations };
+  const asOf = context.now();
+  const records: ProvidedRecord<MaximoWorkOrderRecord>[] = workOrders.map((wo) => ({ value: wo, provenance: { sourceSystem: 'maximo', sourceEntityType: 'work-order', sourceRecordId: wo.workOrderId, observedAt: wo.reportedAt ?? scope.periodEnd, ingestedAt: asOf, qualityState: wo.reportedAt ? 'verified' : 'provisional' } }));
+  const kpiRecord: ProvidedRecord<ContractKpiSet> = { value: kpiSet, provenance: { sourceSystem: kpiSet.evidence.sourceSystem, sourceEntityType: kpiSet.evidence.entityType, sourceRecordId: kpiSet.evidence.entityId, observedAt: kpiSet.evidence.observedAt, ingestedAt: asOf, qualityState: 'verified' } };
+  const governed = computeGovernedKpis({ kpiSet: kpiRecord, workOrders: records, periodStart: scope.periodStart, periodEnd: scope.periodEnd, asOf, mode: 'synthetic' });
+  return { scope, definitionVersion: kpiSet.definitionVersion, workOrders, evidence: governed.evidence, observations: governed.observations, readiness: governed.readiness };
 }
 
 export interface MaintenanceKpiValue {
@@ -48,8 +45,9 @@ export interface MaintenanceKpiValue {
   periodStart: string;
   periodEnd: string;
   definitionVersion: string;
-  kpis: readonly { id: string; name: string; value: number; unit: string; threshold: number | null; status: KpiObservation['status']; formulaVersion: string }[];
+  kpis: readonly { id: string; name: string; value: number; unit: string; threshold: number | null; status: KpiObservation['status']; formulaVersion: string; readiness: 'READY' | 'PROVISIONAL' | 'BLOCKED'; decisionGrade: boolean }[];
   workOrderCount: number;
+  readiness: ReadinessAssessment['state'];
 }
 
 export function createMaintenanceKpiHandler(defaults: AnalysisScope): CapabilityHandler<MaintenanceKpiValue> {
@@ -63,12 +61,14 @@ export function createMaintenanceKpiHandler(defaults: AnalysisScope): Capability
           periodStart: pack.scope.periodStart,
           periodEnd: pack.scope.periodEnd,
           definitionVersion: pack.definitionVersion,
-          kpis: pack.observations.map((o) => ({ id: o.definition.id, name: o.definition.name, value: o.value, unit: o.definition.unit, threshold: o.definition.threshold ?? null, status: o.status, formulaVersion: o.definition.formulaVersion })),
+          kpis: pack.observations.map((o) => ({ id: o.definition.id, name: o.definition.name, value: o.value, unit: o.definition.unit, threshold: o.definition.threshold ?? null, status: o.status, formulaVersion: o.definition.formulaVersion, readiness: o.readiness?.state ?? 'READY', decisionGrade: o.decisionGrade ?? true })),
           workOrderCount: pack.workOrders.length,
+          readiness: pack.readiness.state,
         },
         evidence: pack.evidence,
         assumptions: [
-          `KPI definitions taken from approved set ${pack.definitionVersion}; they are demo definitions unless the contract port says otherwise.`,
+          `KPI definitions taken from set ${pack.definitionVersion} (${pack.readiness.issues.some((i) => i.code === 'demo_kpi_definition') ? 'DEMO ONLY, not contractually approved' : 'approved'}).`,
+          `Data readiness: ${pack.readiness.state}. ${pack.readiness.issues.map((i) => i.detail).join(' ') || 'No data-quality issues.'}`,
           'Work orders outside the period or without a reported timestamp are excluded.',
         ],
       };
@@ -87,12 +87,13 @@ export function createExceptionAnalysisHandler(defaults: AnalysisScope): Capabil
     capability: 'exception-analysis',
     async execute(context): Promise<CapabilityResult<ExceptionAnalysisValue>> {
       const pack = await gatherKpiEvidence(context, defaults);
-      const exceptions = exceptionsFromKpis(pack.observations, { contractId: pack.scope.contractId, priorBreachesByKpi: pack.scope.priorBreachesByKpi });
+      const exceptions = exceptionsFromKpis(pack.observations.filter((o) => o.decisionGrade !== false), { contractId: pack.scope.contractId, priorBreachesByKpi: pack.scope.priorBreachesByKpi });
       return {
         value: { contractId: pack.scope.contractId, periodEnd: pack.scope.periodEnd, exceptions },
         evidence: pack.evidence,
         assumptions: [
           `Prior breach counts: ${JSON.stringify(pack.scope.priorBreachesByKpi ?? {})}. A breach with two or more prior breaches escalates to critical.`,
+          `BLOCKED KPIs are excluded from exceptions. Data readiness: ${pack.readiness.state}.`,
         ],
       };
     },

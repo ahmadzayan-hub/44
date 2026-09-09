@@ -1,13 +1,22 @@
 // GENERATED FILE. Do not edit by hand.
 // Source: src/web/demo-pack.ts via `npm run build:web-data`. Verified by `npm run check:web-data`.
-// Every number here is produced by the deterministic engine in src/. Synthetic demo data only.
+// Static fallback for hosting without the API. Produced by the Control Tower application service from the synthetic provider.
 export const DEMO_PACK = {
   "provenance": {
     "dataModule": "src/demo.ts",
     "engineModule": "src/kpi/engine.ts",
     "formulaVersion": "demo-v1",
-    "synthetic": true
+    "synthetic": true,
+    "mode": "synthetic",
+    "providers": [
+      "synthetic-maximo",
+      "synthetic-contract",
+      "synthetic-condition",
+      "synthetic-finance"
+    ]
   },
+  "generatedAt": "2026-08-31T23:59:59Z",
+  "asOf": "2026-08-31T23:59:59Z",
   "report": {
     "reportId": "DEMO-2026-08",
     "cadence": "monthly",
@@ -16,7 +25,7 @@ export const DEMO_PACK = {
     "periodEnd": "2026-08-31T23:59:59Z",
     "status": "draft"
   },
-  "summary": "Monthly report DEMO-2026-08. 3/5 KPIs are within target. 2 KPI breach(es); 1 critical and 1 high exception(s). This summary is deterministic and contains no LLM-generated facts.",
+  "summary": "Monthly report DEMO-2026-08. 3/5 KPIs are within target. 2 KPI breach(es); 1 critical and 1 high exception(s). 5 KPI(s) provisional: KPI definition set demo-v1 is DEMO ONLY and not contractually approved. This summary is deterministic and contains no LLM-generated facts.",
   "controlTower": {
     "reportId": "DEMO-2026-08",
     "status": "draft",
@@ -35,6 +44,93 @@ export const DEMO_PACK = {
     ],
     "blockers": []
   },
+  "readiness": {
+    "state": "PROVISIONAL",
+    "evaluatedAt": "2026-08-31T23:59:59Z",
+    "issues": [
+      {
+        "code": "demo_kpi_definition",
+        "severity": "warn",
+        "detail": "KPI definition set demo-v1 is DEMO ONLY and not contractually approved.",
+        "kpiIds": []
+      }
+    ],
+    "perKpi": {
+      "availability": {
+        "state": "PROVISIONAL",
+        "issues": [
+          {
+            "code": "demo_kpi_definition",
+            "severity": "warn",
+            "detail": "KPI definition set demo-v1 is DEMO ONLY and not contractually approved.",
+            "kpiIds": []
+          }
+        ]
+      },
+      "failures": {
+        "state": "PROVISIONAL",
+        "issues": [
+          {
+            "code": "demo_kpi_definition",
+            "severity": "warn",
+            "detail": "KPI definition set demo-v1 is DEMO ONLY and not contractually approved.",
+            "kpiIds": []
+          }
+        ]
+      },
+      "mtbf": {
+        "state": "PROVISIONAL",
+        "issues": [
+          {
+            "code": "demo_kpi_definition",
+            "severity": "warn",
+            "detail": "KPI definition set demo-v1 is DEMO ONLY and not contractually approved.",
+            "kpiIds": []
+          }
+        ]
+      },
+      "mttr": {
+        "state": "PROVISIONAL",
+        "issues": [
+          {
+            "code": "demo_kpi_definition",
+            "severity": "warn",
+            "detail": "KPI definition set demo-v1 is DEMO ONLY and not contractually approved.",
+            "kpiIds": []
+          }
+        ]
+      },
+      "backlog": {
+        "state": "PROVISIONAL",
+        "issues": [
+          {
+            "code": "demo_kpi_definition",
+            "severity": "warn",
+            "detail": "KPI definition set demo-v1 is DEMO ONLY and not contractually approved.",
+            "kpiIds": []
+          }
+        ]
+      }
+    },
+    "freshness": {
+      "latestObservedAt": "2026-08-30T07:00:00Z",
+      "latestIngestedAt": "2026-09-01T00:00:00Z",
+      "ageHours": 0,
+      "maxAgeHours": 168
+    },
+    "counts": {
+      "records": 6,
+      "verified": 6,
+      "provisional": 0,
+      "rejected": 0
+    }
+  },
+  "freshness": {
+    "latestObservedAt": "2026-08-30T07:00:00Z",
+    "ingestedAt": "2026-09-01T00:00:00Z",
+    "ageHours": 0,
+    "records": 6
+  },
   "kpis": [
     {
       "id": "availability",
@@ -45,9 +141,22 @@ export const DEMO_PACK = {
       "direction": "higher_is_better",
       "formulaVersion": "demo-v1",
       "status": "breach",
+      "readiness": {
+        "state": "PROVISIONAL",
+        "reasons": [
+          "KPI definition set demo-v1 is DEMO ONLY and not contractually approved."
+        ]
+      },
+      "decisionGrade": true,
       "exceptionId": "DEMO-CONTRACT:availability:2026-08-31T23:59:59Z",
       "severity": "high",
       "evidence": [
+        {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
         {
           "sourceSystem": "maximo",
           "entityType": "work-order",
@@ -95,9 +204,22 @@ export const DEMO_PACK = {
       "direction": "lower_is_better",
       "formulaVersion": "demo-v1",
       "status": "within_target",
+      "readiness": {
+        "state": "PROVISIONAL",
+        "reasons": [
+          "KPI definition set demo-v1 is DEMO ONLY and not contractually approved."
+        ]
+      },
+      "decisionGrade": true,
       "exceptionId": null,
       "severity": null,
       "evidence": [
+        {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
         {
           "sourceSystem": "maximo",
           "entityType": "work-order",
@@ -145,9 +267,22 @@ export const DEMO_PACK = {
       "direction": "higher_is_better",
       "formulaVersion": "demo-v1",
       "status": "within_target",
+      "readiness": {
+        "state": "PROVISIONAL",
+        "reasons": [
+          "KPI definition set demo-v1 is DEMO ONLY and not contractually approved."
+        ]
+      },
+      "decisionGrade": true,
       "exceptionId": null,
       "severity": null,
       "evidence": [
+        {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
         {
           "sourceSystem": "maximo",
           "entityType": "work-order",
@@ -195,9 +330,22 @@ export const DEMO_PACK = {
       "direction": "lower_is_better",
       "formulaVersion": "demo-v1",
       "status": "breach",
+      "readiness": {
+        "state": "PROVISIONAL",
+        "reasons": [
+          "KPI definition set demo-v1 is DEMO ONLY and not contractually approved."
+        ]
+      },
+      "decisionGrade": true,
       "exceptionId": "DEMO-CONTRACT:mttr:2026-08-31T23:59:59Z",
       "severity": "critical",
       "evidence": [
+        {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
         {
           "sourceSystem": "maximo",
           "entityType": "work-order",
@@ -245,9 +393,22 @@ export const DEMO_PACK = {
       "direction": "lower_is_better",
       "formulaVersion": "demo-v1",
       "status": "within_target",
+      "readiness": {
+        "state": "PROVISIONAL",
+        "reasons": [
+          "KPI definition set demo-v1 is DEMO ONLY and not contractually approved."
+        ]
+      },
+      "decisionGrade": true,
       "exceptionId": null,
       "severity": null,
       "evidence": [
+        {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
         {
           "sourceSystem": "maximo",
           "entityType": "work-order",
@@ -297,6 +458,12 @@ export const DEMO_PACK = {
       "decisionRequired": "Named contract/maintenance owner to review root cause and mitigation before report approval.",
       "evidence": [
         {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
+        {
           "sourceSystem": "maximo",
           "entityType": "work-order",
           "entityId": "WO-1001",
@@ -332,7 +499,8 @@ export const DEMO_PACK = {
           "entityId": "WO-1006",
           "observedAt": "2026-08-30T07:00:00Z"
         }
-      ]
+      ],
+      "kind": "kpi"
     },
     {
       "id": "DEMO-CONTRACT:availability:2026-08-31T23:59:59Z",
@@ -343,6 +511,12 @@ export const DEMO_PACK = {
       "decisionRequired": "Review cause, evidence and corrective action during the current reporting cycle.",
       "evidence": [
         {
+          "sourceSystem": "contract_repository",
+          "entityType": "kpi-definition-set",
+          "entityId": "DEMO-CONTRACT/demo-v1",
+          "observedAt": "2026-08-01T00:00:00Z"
+        },
+        {
           "sourceSystem": "maximo",
           "entityType": "work-order",
           "entityId": "WO-1001",
@@ -378,7 +552,8 @@ export const DEMO_PACK = {
           "entityId": "WO-1006",
           "observedAt": "2026-08-30T07:00:00Z"
         }
-      ]
+      ],
+      "kind": "kpi"
     }
   ],
   "assets": [
@@ -475,27 +650,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 96.429,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 1,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 54,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 0,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     },
@@ -507,27 +687,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 97.788,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 2,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 110.5,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2.5,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 0,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     },
@@ -539,27 +724,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 98.092,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 3,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 128.5,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2.5,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 0,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     },
@@ -571,27 +761,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 98.11,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 4,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 142.75,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2.75,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 1,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     },
@@ -603,27 +798,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 98.38,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 4,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 167,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2.75,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 2,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     },
@@ -635,27 +835,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 98.435,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 4,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 173,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2.75,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 3,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     },
@@ -667,27 +872,32 @@ export const DEMO_PACK = {
         {
           "id": "availability",
           "value": 98.522,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "failures",
           "value": 4,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mtbf",
           "value": 183.25,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "mttr",
           "value": 2.75,
-          "status": "breach"
+          "status": "breach",
+          "readiness": "PROVISIONAL"
         },
         {
           "id": "backlog",
           "value": 3,
-          "status": "within_target"
+          "status": "within_target",
+          "readiness": "PROVISIONAL"
         }
       ]
     }

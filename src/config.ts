@@ -6,6 +6,8 @@ import type { DataClassification } from './agent-os/contracts.ts';
  */
 export interface AppConfig {
   port: number;
+  /** demo: synthetic providers. production: live providers only; synthetic fallback refused. */
+  mode: 'demo' | 'production';
   databaseUrl: string | null;
   classification: DataClassification;
   /** JSON directory of principals with token hashes; null selects the demo directory. */
@@ -28,6 +30,7 @@ export function loadConfig(env: Env): AppConfig {
   const port = Number(env.PORT ?? 4173);
   return {
     port: Number.isFinite(port) && port >= 0 ? port : 4173,
+    mode: env.RAILMIND_MODE?.trim() === 'production' ? 'production' : 'demo',
     databaseUrl: env.DATABASE_URL?.trim() || null,
     classification: classification(env.DATA_CLASSIFICATION?.trim()),
     usersJson: env.RAILMIND_USERS?.trim() || null,
@@ -56,6 +59,7 @@ export function loadConfig(env: Env): AppConfig {
 export function describeConfig(config: AppConfig): Record<string, string | number | boolean> {
   return {
     port: config.port,
+    mode: config.mode,
     persistence: config.databaseUrl ? 'postgres' : 'in-memory',
     classification: config.classification,
     auth: config.usersJson ? 'token' : 'demo',

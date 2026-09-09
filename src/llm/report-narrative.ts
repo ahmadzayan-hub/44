@@ -5,7 +5,8 @@ export async function draftGroundedReportNarrative(
   report: ReportPackage,
   model: ModelGateway,
 ): Promise<string> {
-  const facts = report.kpis.map((kpi) => ({
+  const blocked = report.kpis.filter((kpi) => kpi.decisionGrade === false).map((kpi) => ({ id: kpi.definition.id, readiness: kpi.readiness?.state ?? 'BLOCKED', reasons: kpi.readiness?.reasons ?? [] }));
+  const facts = report.kpis.filter((kpi) => kpi.decisionGrade !== false).map((kpi) => ({
     id: kpi.definition.id,
     name: kpi.definition.name,
     value: kpi.value,
@@ -13,6 +14,8 @@ export async function draftGroundedReportNarrative(
     threshold: kpi.definition.threshold,
     status: kpi.status,
     formulaVersion: kpi.definition.formulaVersion,
+    readiness: kpi.readiness?.state ?? 'READY',
+    readinessNotes: kpi.readiness?.reasons ?? [],
     evidence: kpi.evidence,
   }));
   const exceptions = report.exceptions.map((exception) => ({
@@ -28,11 +31,11 @@ export async function draftGroundedReportNarrative(
     messages: [
       {
         role: 'system',
-        content: 'You are RailMind Reporting Agent. Use only supplied facts. Do not calculate new KPI values, invent causes, contractual clauses, dates or amounts. Clearly label any interpretation as interpretation. If evidence is insufficient, say so.',
+        content: 'You are RailMind Reporting Agent. Use only supplied facts. Do not calculate new KPI values, invent causes, contractual clauses, dates or amounts. Clearly label any interpretation as interpretation. State every PROVISIONAL readiness note and list every BLOCKED KPI as blocked; never present blocked or provisional data as settled. If evidence is insufficient, say so.',
       },
       {
         role: 'user',
-        content: `Draft a concise management narrative for this approved report data:\n${JSON.stringify({ reportId: report.reportId, cadence: report.cadence, periodStart: report.periodStart, periodEnd: report.periodEnd, facts, exceptions })}`,
+        content: `Draft a concise management narrative for this approved report data:\n${JSON.stringify({ reportId: report.reportId, cadence: report.cadence, periodStart: report.periodStart, periodEnd: report.periodEnd, facts, blockedKpis: blocked, exceptions })}`,
       },
     ],
   });

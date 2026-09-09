@@ -52,6 +52,7 @@ export const DEMO_ASSETS: readonly MaximoAssetRecord[] = [
   { assetId: 'TRAM-APS-03', name: 'APS segment 03', assetClass: 'Traction power', location: 'Tram', status: 'OPERATING', criticality: 'medium' },
 ];
 
+/** Everything the synthetic provider serves, in one place. */
 export const DEMO_PM_RECORDS: readonly MaximoPmRecord[] = [
   { pmId: 'PM-ATC-01', assetId: 'ATC-ZC-01', frequency: 90, frequencyUnit: 'DAYS', lastCompletedAt: '2026-05-20T00:00:00Z', nextDueAt: '2026-08-18T00:00:00Z', status: 'ACTIVE' },
   { pmId: 'PM-ATC-02', assetId: 'ATC-ZC-02', frequency: 90, frequencyUnit: 'DAYS', lastCompletedAt: '2026-03-01T00:00:00Z', nextDueAt: '2026-05-30T00:00:00Z', status: 'ACTIVE' },
@@ -72,6 +73,7 @@ export const DEMO_SCOPE = { contractId: 'DEMO-CONTRACT', periodStart, periodEnd,
 export const DEMO_CONTRACT_KPI_SET: ContractKpiSet = {
   contractId: 'DEMO-CONTRACT',
   definitionVersion: 'demo-v1',
+  approvalStatus: 'demo_only',
   definitions: DEMO_KPI_DEFINITIONS,
   plannedServiceMinutesPerPeriod: (start, end) => Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 60_000)),
   assetIds: DEMO_ASSETS.map((asset) => asset.assetId),

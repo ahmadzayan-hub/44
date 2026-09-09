@@ -10,6 +10,8 @@ export interface ContractKpiSet {
   contractId: string;
   /** Version of the approved definition set, e.g. a document revision. */
   definitionVersion: string;
+  /** Governance status of the definition set. Production readiness requires 'approved'. */
+  approvalStatus?: 'approved' | 'draft' | 'unapproved' | 'demo_only';
   definitions: readonly ExecutableKpiDefinition[];
   /** Planned service minutes per reporting period, as defined by the contract. */
   plannedServiceMinutesPerPeriod: (periodStart: string, periodEnd: string) => number;
