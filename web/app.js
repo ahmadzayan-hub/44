@@ -1,7 +1,7 @@
 const state = {
   language: 'ar', compact: false,
   telemetry: { active: true, ticks: 0, timer: null, eventId: 0, lastSignalAt: null, lastSignalLabel: null },
-  gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true }, selected: null, eventLabel: null },
+  gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true, trains: true }, selected: null, eventLabel: null, train: { cycle: 0, active: 'train-r01', lastEvent: null } },
   kpis: [
     { value: '98.522', base: 98.522, unit: '%', precision: 3, status: 'high', ar: 'التوافر التشغيلي', en: 'Operational availability', arTrend: 'أقل من النطاق التجريبي', enTrend: 'Below demo target', target: '≥ 99.5%' },
     { value: '04', base: 4, unit: '', precision: 0, status: 'good', ar: 'حالات العطل', en: 'Failure count', arTrend: 'ضمن الحد التجريبي', enTrend: 'At demo target', target: '≤ 4' },
@@ -51,10 +51,10 @@ function renderReports(){ const r=[[tx('reportMonthly'),'31 Aug 2026',tx('report
 function renderAgents(){ $('#agent-list').innerHTML=state.agents.map(a=>`<div class="agent-row"><span>AI</span><div><b>${local(a)}</b><small>${local(a,'Detail')}</small></div><i>${local(a,'State')}</i></div>`).join(''); }
 const gisCopy = {
   ar: {
-    kicker: 'نموذج GIS تشغيلي', title: 'خريطة شبكة الخط الأحمر', description: 'اعرض طبقات الأصول والأعطال وأوامر العمل في سياق شبكي توضيحي. جميع المواقع والحالات اصطناعية ومحلية.', boundaryTitle: 'محاكاة محلية', boundaryCopy: 'لا توجد إحداثيات أو بيانات تشغيلية حية', layersTitle: 'طبقات الخريطة', layersCopy: 'اختر ما يظهر في مساحة العمل', assets: 'الأصول', assetsCount: '6 نقاط مراقبة', faults: 'الأعطال', faultsCount: 'استثناء حرج واحد', workorders: 'أوامر العمل', workordersCount: '3 عناصر مفتوحة', filter: 'تصفية الحالة', clear: 'مسح', all: 'الكل', critical: 'حرج', watch: 'متابعة', stable: 'مستقر', streamTitle: 'متزامن مع المحاكاة', streamCopy: 'تُحدّث الحالات عند وصول إشارة TLM', mapMode: 'عرض تشغيلي', mapScope: 'نطاق تجريبي · الخط الأحمر', centre: 'المركز المالي', museum: 'منطقة المتحف', marina: 'المارينا', terminal: 'المحطة الطرفية', atc: 'تحكم آلي · متابعة', signal: 'إشارات · مستقر', fault: 'تنبيه MTTR', woOne: 'مفتوح · PM', woTwo: 'مجدول', captionTitle: 'محاكاة شبكة حضرية', captionCopy: 'لا تمثل الموقع أو الأبعاد أو مسار دبي مترو الفعلي.', inspectorTitle: 'مستكشف الشبكة', inspectorCopy: 'اختر محطة أو رمزاً على الخريطة لمراجعة الحالة والأدلة وارتباط القرار.', evidence: 'مسار الدليل', decision: 'عرض حزمة القرار ↗', statusTitle: 'الشبكة مستقرة ضمن نطاق العرض التجريبي', statusCopy: '1 حرج · 2 متابعة · 3 مستقرة · يتم التحديث محلياً فقط', station: 'محطة', asset: 'أصل', faultType: 'تنبيه عطل', workorder: 'أمر عمل', statusStable: 'مستقر', statusWatch: 'متابعة', statusCritical: 'حرج', telemetry: 'آخر إشارة توضيحية'
+    kicker: 'نموذج GIS تشغيلي', title: 'خريطة شبكة الخط الأحمر', description: 'اعرض طبقات الأصول والأعطال وأوامر العمل في سياق شبكي توضيحي. جميع المواقع والحالات اصطناعية ومحلية.', boundaryTitle: 'محاكاة محلية', boundaryCopy: 'لا توجد إحداثيات أو بيانات تشغيلية حية', layersTitle: 'طبقات الخريطة', layersCopy: 'اختر ما يظهر في مساحة العمل', assets: 'الأصول', assetsCount: '6 نقاط مراقبة', faults: 'الأعطال', faultsCount: 'استثناء حرج واحد', workorders: 'أوامر العمل', workordersCount: '3 عناصر مفتوحة', trains: 'حركة القطارات', trainsCount: '3 قطارات محاكاة محلية', trainHudTitle: 'حركة قطارات محاكاة محلية', trainHudCopy: '3 رحلات توضيحية على الخط الأحمر', train: 'قطار', filter: 'تصفية الحالة', clear: 'مسح', all: 'الكل', critical: 'حرج', watch: 'متابعة', stable: 'مستقر', streamTitle: 'متزامن مع المحاكاة', streamCopy: 'تُحدّث الحالات عند وصول إشارة TLM', mapMode: 'عرض تشغيلي', mapScope: 'نطاق تجريبي · الخط الأحمر', centre: 'المركز المالي', museum: 'منطقة المتحف', marina: 'المارينا', terminal: 'المحطة الطرفية', atc: 'تحكم آلي · متابعة', signal: 'إشارات · مستقر', fault: 'تنبيه MTTR', woOne: 'مفتوح · PM', woTwo: 'مجدول', captionTitle: 'محاكاة شبكة حضرية', captionCopy: 'لا تمثل الموقع أو الأبعاد أو مسار دبي مترو الفعلي.', inspectorTitle: 'مستكشف الشبكة', inspectorCopy: 'اختر محطة أو رمزاً على الخريطة لمراجعة الحالة والأدلة وارتباط القرار.', evidence: 'مسار الدليل', decision: 'عرض حزمة القرار ↗', statusTitle: 'الشبكة مستقرة ضمن نطاق العرض التجريبي', statusCopy: '1 حرج · 2 متابعة · 3 مستقرة · يتم التحديث محلياً فقط', station: 'محطة', asset: 'أصل', faultType: 'تنبيه عطل', workorder: 'أمر عمل', statusStable: 'مستقر', statusWatch: 'متابعة', statusCritical: 'حرج', telemetry: 'آخر إشارة توضيحية'
   },
   en: {
-    kicker: 'OPERATIONAL GIS MODEL', title: 'Red Line network map', description: 'Review asset, fault, and work-order layers in an illustrative network context. All positions and states are synthetic and local.', boundaryTitle: 'Local simulation', boundaryCopy: 'No live coordinates or operational data', layersTitle: 'Map layers', layersCopy: 'Choose what is visible in the workspace', assets: 'Assets', assetsCount: '6 monitored points', faults: 'Faults', faultsCount: '1 critical exception', workorders: 'Work orders', workordersCount: '3 open items', filter: 'Filter by state', clear: 'Clear', all: 'All', critical: 'Critical', watch: 'Watch', stable: 'Stable', streamTitle: 'Synced to simulation', streamCopy: 'States update when a TLM signal arrives', mapMode: 'Operational view', mapScope: 'Pilot scope · Red Line', centre: 'Financial Centre', museum: 'Museum District', marina: 'Marina', terminal: 'Terminal', atc: 'ATC · Watch', signal: 'Signalling · Stable', fault: 'MTTR alert', woOne: 'Open · PM', woTwo: 'Scheduled', captionTitle: 'Urban network simulation', captionCopy: 'Does not represent the location, dimensions, or actual Dubai Metro alignment.', inspectorTitle: 'Network explorer', inspectorCopy: 'Select a station or symbol to review state, evidence, and decision linkage.', evidence: 'Evidence trail', decision: 'Open decision pack ↗', statusTitle: 'Network stable within the illustrative scope', statusCopy: '1 critical · 2 watch · 3 stable · locally updated only', station: 'Station', asset: 'Asset', faultType: 'Fault alert', workorder: 'Work order', statusStable: 'Stable', statusWatch: 'Watch', statusCritical: 'Critical', telemetry: 'Latest illustrative signal'
+    kicker: 'OPERATIONAL GIS MODEL', title: 'Red Line network map', description: 'Review asset, fault, and work-order layers in an illustrative network context. All positions and states are synthetic and local.', boundaryTitle: 'Local simulation', boundaryCopy: 'No live coordinates or operational data', layersTitle: 'Map layers', layersCopy: 'Choose what is visible in the workspace', assets: 'Assets', assetsCount: '6 monitored points', faults: 'Faults', faultsCount: '1 critical exception', workorders: 'Work orders', workordersCount: '3 open items', trains: 'Train movement', trainsCount: '3 locally simulated trains', trainHudTitle: 'Local simulated train movement', trainHudCopy: '3 illustrative services on the Red Line', train: 'Train', filter: 'Filter by state', clear: 'Clear', all: 'All', critical: 'Critical', watch: 'Watch', stable: 'Stable', streamTitle: 'Synced to simulation', streamCopy: 'States update when a TLM signal arrives', mapMode: 'Operational view', mapScope: 'Pilot scope · Red Line', centre: 'Financial Centre', museum: 'Museum District', marina: 'Marina', terminal: 'Terminal', atc: 'ATC · Watch', signal: 'Signalling · Stable', fault: 'MTTR alert', woOne: 'Open · PM', woTwo: 'Scheduled', captionTitle: 'Urban network simulation', captionCopy: 'Does not represent the location, dimensions, or actual Dubai Metro alignment.', inspectorTitle: 'Network explorer', inspectorCopy: 'Select a station or symbol to review state, evidence, and decision linkage.', evidence: 'Evidence trail', decision: 'Open decision pack ↗', statusTitle: 'Network stable within the illustrative scope', statusCopy: '1 critical · 2 watch · 3 stable · locally updated only', station: 'Station', asset: 'Asset', faultType: 'Fault alert', workorder: 'Work order', statusStable: 'Stable', statusWatch: 'Watch', statusCritical: 'Critical', telemetry: 'Latest illustrative signal'
   }
 };
 
@@ -67,13 +67,16 @@ const gisRecords = {
   signal: { type: 'asset', status: 'stable', arName: 'SIG-CB-14', enName: 'SIG-CB-14', arContext: 'أصل إشارات مستقر في العينة، يُعرض لتوضيح طبقة الأصول فقط.', enContext: 'A stable signalling asset in the sample, shown to illustrate the asset layer only.', arFacts: [['الفئة', 'إشارات'], ['الحالة', 'مستقر'], ['تغطية الدليل', 'مكتملة']], enFacts: [['Class', 'Signalling'], ['State', 'Stable'], ['Evidence coverage', 'Complete']], evidence: 'Maximo Demo · SIG-CB-14', decision: 'DEC-043' },
   fault: { type: 'faultType', status: 'critical', arName: 'تنبيه MTTR متكرر', enName: 'Persistent MTTR alert', arContext: 'تنبيه استثنائي تولّده قواعد KPI التجريبية، وليس إنذاراً مباشراً من نظام تحكم.', enContext: 'An exception alert generated by demo KPI rules, not a direct control-system alarm.', arFacts: [['الشدة', 'حرج'], ['قاعدة KPI', 'MTTR v1.0'], ['الحالة', 'مراجعة بشرية']], enFacts: [['Severity', 'Critical'], ['KPI rule', 'MTTR v1.0'], ['State', 'Human review']], evidence: 'Maximo Demo · WO-1001–WO-1004', decision: 'DEC-042' },
   'wo-1': { type: 'workorder', status: 'watch', arName: 'WO-1005', enName: 'WO-1005', arContext: 'أمر صيانة وقائية مفتوح ضمن الحزمة الاصطناعية، ويتطلب تأكيد الجدولة.', enContext: 'An open preventive-maintenance order in the synthetic pack, requiring schedule confirmation.', arFacts: [['الحالة', 'WAPPR'], ['الفئة', 'صيانة وقائية'], ['الاستحقاق', 'يوم عمل']], enFacts: [['State', 'WAPPR'], ['Class', 'Preventive maintenance'], ['Due', 'One business day']], evidence: 'Maximo Demo · WO-1005', decision: 'DEC-044' },
-  'wo-2': { type: 'workorder', status: 'stable', arName: 'WO-1006', enName: 'WO-1006', arContext: 'أمر عمل مجدول في المحاكاة، مع مسار دليل يمكن عرضه قبل اتخاذ القرار.', enContext: 'A scheduled work order in the simulation, with an evidence trail available before a decision.', arFacts: [['الحالة', 'مجدول'], ['الفئة', 'فحص دوري'], ['الاستحقاق', 'مؤكد']], enFacts: [['State', 'Scheduled'], ['Class', 'Periodic inspection'], ['Due', 'Confirmed']], evidence: 'Maximo Demo · WO-1006', decision: 'DEC-044' }
+  'wo-2': { type: 'workorder', status: 'stable', arName: 'WO-1006', enName: 'WO-1006', arContext: 'أمر عمل مجدول في المحاكاة، مع مسار دليل يمكن عرضه قبل اتخاذ القرار.', enContext: 'A scheduled work order in the simulation, with an evidence trail available before a decision.', arFacts: [['الحالة', 'مجدول'], ['الفئة', 'فحص دوري'], ['الاستحقاق', 'مؤكد']], enFacts: [['State', 'Scheduled'], ['Class', 'Periodic inspection'], ['Due', 'Confirmed']], evidence: 'Maximo Demo · WO-1006', decision: 'DEC-044' },
+  'train-r01': { type: 'train', status: 'stable', arName: 'قطار R01', enName: 'Train R01', arContext: 'قطار تمثيلي يتحرك ضمن نموذج الخط الأحمر المحلي. لا يمثل رحلة أو موقعاً فعلياً.', enContext: 'An illustrative train moving within the local Red Line model. It does not represent a live service or location.', arFacts: [['الحالة', 'حركة محاكاة'], ['المسار', 'الخط الأحمر التوضيحي'], ['المصدر', 'TLM محلي']], enFacts: [['State', 'Simulated movement'], ['Route', 'Illustrative Red Line'], ['Source', 'Local TLM']], evidence: 'GIS Demo · TR-R01', decision: 'DEC-043' },
+  'train-r02': { type: 'train', status: 'watch', arName: 'قطار R02', enName: 'Train R02', arContext: 'قطار تمثيلي في حالة متابعة ضمن العرض المحلي. لا يمثل تنبيهاً من منظومة تحكم أو رحلة فعلية.', enContext: 'An illustrative train in a watch state within the local presentation. It is not a control-system alert or live service.', arFacts: [['الحالة', 'متابعة محاكاة'], ['السياق', 'مراجعة توضيحية'], ['المصدر', 'TLM محلي']], enFacts: [['State', 'Simulation watch'], ['Context', 'Illustrative review'], ['Source', 'Local TLM']], evidence: 'GIS Demo · TR-R02', decision: 'DEC-042' },
+  'train-r03': { type: 'train', status: 'stable', arName: 'قطار R03', enName: 'Train R03', arContext: 'قطار تمثيلي ثانٍ يعرض تباعد الحركة داخل المخطط المحلي فقط.', enContext: 'A second illustrative train that visualises service separation within the local schematic only.', arFacts: [['الحالة', 'حركة محاكاة'], ['المسار', 'الخط الأحمر التوضيحي'], ['المصدر', 'TLM محلي']], enFacts: [['State', 'Simulated movement'], ['Route', 'Illustrative Red Line'], ['Source', 'Local TLM']], evidence: 'GIS Demo · TR-R03', decision: 'DEC-044' }
 };
 
 function renderGisText() {
   if (!$('#view-network')) return;
   const copy = gisCopy[state.language];
-  const values = { 'gis-kicker': 'kicker', 'gis-title': 'title', 'gis-description': 'description', 'gis-boundary-title': 'boundaryTitle', 'gis-boundary-copy': 'boundaryCopy', 'gis-layers-title': 'layersTitle', 'gis-layers-copy': 'layersCopy', 'gis-assets-label': 'assets', 'gis-assets-count': 'assetsCount', 'gis-faults-label': 'faults', 'gis-faults-count': 'faultsCount', 'gis-workorders-label': 'workorders', 'gis-workorders-count': 'workordersCount', 'gis-filter-label': 'filter', 'gis-clear-filter': 'clear', 'gis-stream-title': 'streamTitle', 'gis-stream-copy': 'streamCopy', 'gis-map-mode': 'mapMode', 'gis-map-scope': 'mapScope', 'gis-station-centre': 'centre', 'gis-station-museum': 'museum', 'gis-station-marina': 'marina', 'gis-station-terminal': 'terminal', 'gis-atc-label': 'atc', 'gis-signal-label': 'signal', 'gis-fault-label': 'fault', 'gis-wo-1-label': 'woOne', 'gis-wo-2-label': 'woTwo', 'gis-caption-title': 'captionTitle', 'gis-caption-copy': 'captionCopy', 'gis-inspector-title': 'inspectorTitle', 'gis-inspector-copy': 'inspectorCopy', 'gis-evidence-label': 'evidence', 'gis-open-decision': 'decision', 'gis-status-strip-title': 'statusTitle', 'gis-status-strip-copy': 'statusCopy' };
+  const values = { 'gis-kicker': 'kicker', 'gis-title': 'title', 'gis-description': 'description', 'gis-boundary-title': 'boundaryTitle', 'gis-boundary-copy': 'boundaryCopy', 'gis-layers-title': 'layersTitle', 'gis-layers-copy': 'layersCopy', 'gis-assets-label': 'assets', 'gis-assets-count': 'assetsCount', 'gis-faults-label': 'faults', 'gis-faults-count': 'faultsCount', 'gis-workorders-label': 'workorders', 'gis-workorders-count': 'workordersCount', 'gis-trains-label': 'trains', 'gis-trains-count': 'trainsCount', 'gis-train-hud-title': 'trainHudTitle', 'gis-train-hud-copy': 'trainHudCopy', 'gis-filter-label': 'filter', 'gis-clear-filter': 'clear', 'gis-stream-title': 'streamTitle', 'gis-stream-copy': 'streamCopy', 'gis-map-mode': 'mapMode', 'gis-map-scope': 'mapScope', 'gis-station-centre': 'centre', 'gis-station-museum': 'museum', 'gis-station-marina': 'marina', 'gis-station-terminal': 'terminal', 'gis-atc-label': 'atc', 'gis-signal-label': 'signal', 'gis-fault-label': 'fault', 'gis-wo-1-label': 'woOne', 'gis-wo-2-label': 'woTwo', 'gis-caption-title': 'captionTitle', 'gis-caption-copy': 'captionCopy', 'gis-inspector-title': 'inspectorTitle', 'gis-inspector-copy': 'inspectorCopy', 'gis-evidence-label': 'evidence', 'gis-open-decision': 'decision', 'gis-status-strip-title': 'statusTitle', 'gis-status-strip-copy': 'statusCopy' };
   Object.entries(values).forEach(([id, key]) => { const element = $(`#${id}`); if (element) element.textContent = copy[key]; });
   $$('.gis-filter').forEach((button) => { button.textContent = copy[button.dataset.gisFilter]; });
   [['.gis-station--a small', 'ST-01'], ['.gis-station--b small', 'ST-02'], ['.gis-station--c small', 'ST-03'], ['.gis-station--d small', 'ST-04']].forEach(([selector, code]) => { const node = $(selector); const parent = node?.closest('[data-gis-node]'); if (node && parent) node.textContent = `${code} · ${copy[`status${parent.dataset.status[0].toUpperCase()}${parent.dataset.status.slice(1)}`]}`; });
@@ -85,10 +88,22 @@ function renderGisStream() {
   const copy = gisCopy[state.language];
   const event = state.gis.eventLabel || (state.language === 'ar' ? 'TLM-000 · جاهز' : 'TLM-000 · Ready');
   $('#gis-map-events').textContent = `${copy.telemetry}: ${event}`;
+  renderTrainHud();
+}
+
+function renderTrainHud() {
+  const hud = $('#gis-train-hud');
+  if (!hud) return;
+  const copy = gisCopy[state.language];
+  const current = trainSimulation[state.gis.train.cycle % trainSimulation.length];
+  $('#gis-train-hud-title').textContent = copy.trainHudTitle;
+  $('#gis-train-hud-copy').textContent = state.gis.train.lastEvent || copy.trainHudCopy;
+  $('#gis-train-hud-code').textContent = current.code;
+  $$('.gis-train-marker').forEach((marker) => marker.classList.toggle('gis-train-marker--active', marker.dataset.gisNode === state.gis.train.active));
 }
 
 function applyGisFilters() {
-  $$('.gis-station,.gis-asset-marker,.gis-fault-marker,.gis-workorder-marker').forEach((item) => {
+  $$('.gis-station,.gis-asset-marker,.gis-fault-marker,.gis-workorder-marker,.gis-train-marker').forEach((item) => {
     const layer = item.dataset.gisItem;
     const visibleLayer = !layer || state.gis.layers[layer];
     const visibleState = state.gis.filter === 'all' || item.dataset.status === state.gis.filter;
@@ -137,6 +152,21 @@ const telemetrySignals = [
   { asset: 'MAXIMO-DEMO', ar: 'تحديث سجل مصدر توضيحي', en: 'Illustrative source record refreshed' },
 ];
 
+const trainSimulation = [
+  { id: 'train-r01', code: 'R01', ar: 'R01 يتجه داخل المسار التوضيحي', en: 'R01 progressing on the illustrative route' },
+  { id: 'train-r02', code: 'R02', ar: 'R02 في نقطة متابعة توضيحية', en: 'R02 at an illustrative watch point' },
+  { id: 'train-r03', code: 'R03', ar: 'R03 يحافظ على تباعد محاكاة محلي', en: 'R03 maintaining local simulated separation' },
+];
+
+function advanceTrainSimulation() {
+  const train = state.gis.train;
+  train.cycle = (train.cycle + 1) % trainSimulation.length;
+  const current = trainSimulation[train.cycle];
+  train.active = current.id;
+  train.lastEvent = `${current.code} · ${state.language === 'ar' ? current.ar : current.en}`;
+  renderTrainHud();
+}
+
 function telemetryValue(value, precision, index) {
   const waveform = Math.sin((state.telemetry.ticks + 1) * (1.21 + index * 0.19));
   const amplitude = [0.018, 0, 1.6, 0.04, 0][index];
@@ -176,6 +206,7 @@ function emitTelemetry({ announce = false } = {}) {
   $('#telemetry-event').textContent = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${signal.asset}`;
   stream.lastSignalLabel = state.language === 'ar' ? signal.ar : signal.en;
   state.gis.eventLabel = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${state.language === 'ar' ? signal.ar : signal.en}`;
+  advanceTrainSimulation();
   renderTelemetry();
   renderGisStream();
   if (announce) toast(state.language === 'ar' ? 'تم تحديث مؤشرات المحاكاة محلياً.' : 'Local simulation indicators updated.');
@@ -201,10 +232,14 @@ function resetTelemetry() {
   state.telemetry.eventId = 0;
   state.telemetry.lastSignalAt = null;
   state.telemetry.lastSignalLabel = null;
+  state.gis.train.cycle = 0;
+  state.gis.train.active = 'train-r01';
+  state.gis.train.lastEvent = null;
   state.kpis.forEach((kpi) => { kpi.value = kpi.precision === 0 ? String(kpi.base).padStart(2, '0') : Number(kpi.base).toFixed(kpi.precision); });
   renderKpis();
   $('#telemetry-event').textContent = 'TLM-000 · BASELINE';
   renderTelemetry();
+  renderGisStream();
   toast(tx('telemetryReset'));
 }
 
