@@ -27,16 +27,20 @@ Current stage: **P0 synthetic demo**. Nothing here is connected to live RTA, Max
 
 ```
 src/
-  agent-os/        contracts (types), policy (P0 execution rules + release readiness), catalog (7 agents), kernel (deterministic routing), memory (in-memory store)
+  agent-os/        contracts, policy (execution rules + release readiness), catalog (7 agents with capability minimum risk), kernel (routing + risk escalation), orchestrator (runtime), tools (registry + plan-scoped invoker), standard-tools (ports -> tool ids), handlers (capability contract), memory
+  agents/          executable capability handlers: data-quality, maintenance-kpi + exception-analysis, reporting (monthly/quarterly/annual) + executive-briefing, scope resolution
+  app/compose.ts   composition root: builds ports, adapters, runtime and API dependencies from config
+  config.ts        typed environment configuration (.env.example documents every variable)
   api/router.ts    local decision API (report transitions, reset, audited agent planning, audit trail); runtime-neutral, hosted by server.mjs
   audit/           append-only, SHA-256 hash-chained audit log (in-memory adapter)
   persistence/     SQL ports, PostgreSQL adapters (audit, memory, report store), lazy `pg` loader
   connectors/maximo/ port (anti-corruption interfaces), client (read-only REST adapter), mock (in-memory port)
+  connectors/contract/ contract context port (approved KPI definition sets); in-memory adapter serving the demo set
   data/canonical.ts  canonical decision projections (asset, work order, invoice, contract, snapshot)
   kpi/             engine (availability, failure count, MTBF, MTTR, backlog) + demo definitions
   exceptions/      exception severity from KPI observations (breach + prior breaches -> critical)
   reporting/       contracts, generator (deterministic executive summary), approval (state machine), store (report state port)
-  llm/             OpenAI-compatible gateway (fetch only) + grounded report-narrative prompt
+  llm/             OpenAI-compatible gateway (fetch only), grounded report-narrative prompt, model invocation policy (classification x endpoint locality)
   forecast/        deterministic P25/P50/P75 schedule-adjusted expenditure pace model
   control-tower/   view model counts for the Control Tower
   web/demo-pack.ts projects engine outputs into the browser data pack (generated file: web/data/demo-pack.js)
@@ -48,9 +52,10 @@ web/
   styles.css       single-file design system
   portfolio.html   self-contained sanitised portfolio dashboard, embedded in an iframe
 index.html         application shell
-server.mjs         static server + decision API; in-memory adapters by default, PostgreSQL when DATABASE_URL is set
+server.mjs         host: loads config, composes the application, serves static files + API with structured logs and graceful shutdown
+Dockerfile, infra/docker-compose.yml, .env.example, .github/workflows/ci.yml   runtime and CI infrastructure
 infra/sql/         schema for RailMind-owned tables (audit rows append-only by trigger)
-tests/             node:test suites (50 tests; the live PostgreSQL test is skipped unless DATABASE_URL is set)
+tests/             node:test suites (64 tests; the live PostgreSQL test is skipped unless DATABASE_URL is set)
 scripts/           build-web-data.mjs, check-web-data.mjs, check-portfolio.mjs, package-smoke.mjs
 docs/              product authority, architecture, data contract, pilot plan, status, reviews, deployment
 infra/             optional PostgreSQL + pgvector compose file
@@ -80,11 +85,19 @@ Run `npm run verify` before every commit. All tests must pass. If you change `sr
 - Prose in docs: no em dashes. Short sentences. Facts, assumptions, risks and recommendations kept separate.
 - Do not put a model name or AI identifier in commits, code comments or docs.
 
-## Known gaps (as of 2026-09-09, after the credibility fixes)
+## Adding an agent capability
 
-- No GitHub Actions workflow is active. `docs/CI_WORKFLOW_TEMPLATE.yml` must be moved to `.github/workflows/ci.yml` once the workflows permission exists.
-- No authentication, RBAC or data classification exists yet. These are release gates before any live data.
-- The API has no authentication. Actor id and role are caller-supplied and recorded as given. Bind them to an authenticated principal before live data.
+1. Register the capability, allowed action modes, allowed tool ids and minimum risk class in `src/agent-os/catalog.ts`.
+2. Implement a `CapabilityHandler` in `src/agents/` that reaches data only through `context.tools` and returns evidence for every conclusion.
+3. Register it in `createStandardHandlers`. A catalog capability without a handler fails closed at run time and is absent from `/api/health`.
+4. Add an orchestrator test that asserts the tool trail, evidence count and release readiness.
+
+## Known gaps (as of 2026-09-09, after the runtime work)
+
+- No authentication or RBAC. `DATA_CLASSIFICATION` is a deployment setting, not per-record classification.
+- Five catalog capabilities have no handler yet: asset-health, failure-risk, maintenance-priority, contract-context, finance-context.
+- Run records live in process memory (`/api/runs`); only their audit events and decision memory are persisted.
+- The runtime is single-step: one handler per run, no model planning, no retries, no scheduling.
 - Only one report package (the demo seed) is served. Multi-report and multi-contract scoping is not built.
 - The KPI values in the preview still come from the generated pack, not from the API. Only report status, readiness and audit are live.
 - PM compliance KPI, data-quality service, contract-context port and finance-context port are documented but not implemented.

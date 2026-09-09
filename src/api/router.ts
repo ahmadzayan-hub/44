@@ -1,7 +1,8 @@
 import { AGENT_CATALOG } from '../agent-os/catalog.ts';
-import type { ActionMode, AgentTask, HumanApproval, RiskClass } from '../agent-os/contracts.ts';
+import type { ActionMode, AgentTask, DataClassification, HumanApproval, RiskClass } from '../agent-os/contracts.ts';
 import { createExecutionPlan } from '../agent-os/kernel.ts';
 import type { MemoryStore } from '../agent-os/memory.ts';
+import type { AgentRuntime } from '../agent-os/orchestrator.ts';
 import type { AuditLog } from '../audit/log.ts';
 import { reportReadiness, transitionReport, type ReportTransition } from '../reporting/approval.ts';
 import type { ReportPackage } from '../reporting/contracts.ts';
@@ -22,6 +23,12 @@ export interface ApiDependencies {
   seedReport: ReportPackage;
   now?: () => string;
   persistence: 'in-memory' | 'postgres';
+  /** Orchestrator for governed agent runs. Optional so the API can serve without handlers. */
+  runtime?: AgentRuntime;
+  /** Classification of the data this deployment handles; drives model policy. */
+  classification?: DataClassification;
+  /** Dependency probe (e.g. SELECT 1) used by /api/health. */
+  healthCheck?: () => Promise<void>;
 }
 
 /** Structural subset of Node's IncomingMessage/ServerResponse so src/ stays runtime-neutral. */
@@ -145,7 +152,24 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
 
   async function route(method: string, path: string, req: ApiRequest): Promise<{ status: number; body: unknown }> {
     if (method === 'GET' && path === '/api/health') {
-      return { status: 200, body: { service: 'Project 44 RailMind Agent OS', status: 'ok', mode: 'p0-demo', persistence: deps.persistence } };
+      let dependency: 'ok' | 'failed' | 'not-applicable' = 'not-applicable';
+      if (deps.healthCheck) {
+        try { await deps.healthCheck(); dependency = 'ok'; } catch { dependency = 'failed'; }
+      }
+      const body = { service: 'Project 44 RailMind Agent OS', status: dependency === 'failed' ? 'degraded' : 'ok', mode: 'p0-demo', persistence: deps.persistence, dependency, classification: deps.classification ?? 'synthetic', capabilities: deps.runtime?.capabilities() ?? [] };
+      return { status: dependency === 'failed' ? 503 : 200, body };
+    }
+    if (method === 'GET' && path === '/api/runs') {
+      return { status: 200, body: { runs: deps.runtime?.runs() ?? [] } };
+    }
+    if (method === 'POST' && path === '/api/agent/run') {
+      if (!deps.runtime) throw new HttpError(503, 'No agent runtime is configured in this deployment.');
+      const body = await readJson(req);
+      const task = buildTask(body, now());
+      const context = body.context;
+      const scoped: AgentTask = typeof context === 'object' && context !== null && !Array.isArray(context) ? { ...task, context: context as Record<string, unknown> } : task;
+      const record = await deps.runtime.run(scoped, { classification: deps.classification ?? 'synthetic' });
+      return { status: record.status === 'completed' ? 200 : record.status === 'blocked' ? 403 : 422, body: record };
     }
     if (method === 'GET' && path === '/api/report') {
       return { status: 200, body: await reportView() };

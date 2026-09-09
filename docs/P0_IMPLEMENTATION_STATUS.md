@@ -11,7 +11,13 @@ Status date: 2026-09-09
 | Monthly/Quarterly/Annual report package | Implemented | `src/reporting/generator.ts` |
 | Open-source LLM gateway | Implemented adapter | `src/llm/openai-compatible.ts` |
 | Grounded reporting prompt | Implemented | `src/llm/report-narrative.ts` |
-| Agent policy kernel | Implemented | `src/agent-os/*` |
+| Agent policy kernel | Implemented | `src/agent-os/kernel.ts`, `policy.ts`; risk class escalated to the capability minimum |
+| Agent OS runtime (orchestrator) | Implemented | `src/agent-os/orchestrator.ts`, `tools.ts`, `standard-tools.ts`, `handlers.ts`; see ADR-003 |
+| Capability handlers | Implemented (7) | `src/agents/*`: data-quality, maintenance-kpi, exception-analysis, monthly/quarterly/annual-report, executive-briefing. Not implemented: asset-health, failure-risk, maintenance-priority, contract-context, finance-context (fail closed) |
+| Model invocation policy | Implemented | `src/llm/policy.ts`: local vs remote endpoint, data classification, explicit remote approvals |
+| Contract context port | Implemented (in-memory) | `src/connectors/contract/port.ts` serving the demo definition set |
+| Composition root and configuration | Implemented | `src/app/compose.ts`, `src/config.ts`, `.env.example` |
+| Containers and CI | Implemented | `Dockerfile`, `infra/docker-compose.yml`, `.github/workflows/ci.yml` |
 | Control Tower view model | Implemented | `src/control-tower/view-model.ts` |
 | Bilingual Control Tower UX | Implemented | `index.html`, `web/*` with Arabic RTL, English toggle, evidence drawer and responsive controls |
 | Engine-driven preview data | Implemented | `src/web/demo-pack.ts` generates `web/data/demo-pack.js`; `npm run check:web-data` blocks drift |

@@ -40,7 +40,10 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - hash-chained, append-only audit log for report transitions, approvals and agent runs
 - release-readiness policy: no high-impact output is release-ready without decision-grade evidence and a named approved review
 - engine-generated browser data pack: every number in the preview is produced by the deterministic engine and verified against it
-- local decision API: report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate is interactive
+- Agent OS runtime (orchestrator): deterministic routing, risk escalation to the capability minimum, plan-scoped read-only tools, model access by data-classification policy, evidence verification, approval gate, hash-chained audit and structured decision memory (ADR-003)
+- executable capability handlers: data quality, maintenance KPI, exception analysis, monthly/quarterly/annual reporting (deterministic narrative, model narrative when policy allows) and executive briefing that consumes governed decision memory
+- contract context port serving approved KPI definition sets (demo set in P0)
+- local decision API: governed agent runs, report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate and agent workspace are interactive
 - PostgreSQL adapters for the audit log, memory store and report state behind the same interfaces, with a database-level append-only guard on audit rows
 - local verification, packaged build smoke test and static preview smoke test, with a GitHub Actions activation template
 
@@ -78,11 +81,25 @@ The browser layer owns bilingual labels and layout only. If a number on screen i
 | GET | `/api/report` | current report package, readiness (next transitions and blockers) and its audit trail |
 | POST | `/api/report/transition` | `{ type, actorId, actorRole?, note?, at? }` with `type` one of `submit_for_review`, `approve`, `reject`, `lock`; refused transitions return 409 with blockers and are audited |
 | POST | `/api/report/reset` | `{ actorId }` restores the demo package; audited |
-| POST | `/api/agent/task` | `{ capability, actorId, goal, riskClass, actionMode }` routes through the kernel; planned or blocked runs are audited and recorded in episodic memory |
+| POST | `/api/agent/task` | `{ capability, actorId, goal, riskClass, actionMode }` routes through the kernel without executing; audited |
+| POST | `/api/agent/run` | same body plus optional `context` scope; executes the capability through the orchestrator and returns the run record with grounded output, tool calls, model use, approval requirement and audit sequences |
+| GET | `/api/runs` | run records of this process |
 | GET | `/api/audit` | all audit events with hash-chain verification |
 | GET | `/api/agents` | the registered agent catalog |
 
-P0 has no authentication. The named actor is supplied by the caller and recorded as given. Authentication and role-based access control are release gates before any live data.
+P0 has no authentication. The named actor is supplied by the caller and recorded as given. Authentication and role-based access control are release gates before any live data. The OpenAPI description is in `docs/openapi.yaml`.
+
+### Configuration
+
+All configuration is read from environment variables by `src/config.ts` (see `.env.example`). Without any variable the server runs the synthetic in-memory demo. `DATABASE_URL` enables PostgreSQL. `LLM_BASE_URL` and `LLM_MODEL` enable an OpenAI-compatible model gateway; `DATA_CLASSIFICATION` and the `LLM_REMOTE_APPROVED_*` flags control whether a model may be used for the data at hand. `MAXIMO_BASE_URL` switches the Maximo port from the mock to the read-only REST client.
+
+### Containers
+
+`Dockerfile` runs the server with Node 22 and no build step. `infra/docker-compose.yml` starts PostgreSQL and the app together:
+
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```
 
 ### Persistence
 
@@ -130,5 +147,7 @@ Maximo / Finance / Contracts / Condition feeds
 - `docs/DEPLOYMENT.md`
 - `docs/MIGRATION_FROM_RAILMIND.md`
 - `docs/ADR-002_PLATFORM_SCOPE.md`
+- `docs/ADR-003_AGENT_RUNTIME.md`
+- `docs/openapi.yaml`
 - `docs/UX_REVIEW_2026-09-09.md`
 - `docs/CI_WORKFLOW_TEMPLATE.yml`

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Browser script syntax check
+        run: node --check web/app.js
+      - run: npm run verify
+      - name: Static preview smoke test
+        run: |
+          npm run serve > /tmp/railmind.log 2>&1 &
+          PID=$!
+          sleep 2
+          curl --fail http://127.0.0.1:4173/api/health
+          curl --fail http://127.0.0.1:4173/api/report | grep -q '"status":"draft"'
+          curl --fail http://127.0.0.1:4173/ | grep -q 'RailMind Agent OS'
+          kill $PID

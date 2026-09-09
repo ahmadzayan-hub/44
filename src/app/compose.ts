@@ -1,0 +1,86 @@
+import { AGENT_CATALOG } from '../agent-os/catalog.ts';
+import type { ModelGateway } from '../agent-os/contracts.ts';
+import { InMemoryMemoryStore, type MemoryStore } from '../agent-os/memory.ts';
+import { AgentRuntime } from '../agent-os/orchestrator.ts';
+import { buildStandardTools } from '../agent-os/standard-tools.ts';
+import { createStandardHandlers } from '../agents/index.ts';
+import { InMemoryAuditLog, type AuditLog } from '../audit/log.ts';
+import { InMemoryContractReadPort } from '../connectors/contract/port.ts';
+import { MaximoRestClient } from '../connectors/maximo/client.ts';
+import { MockMaximoReadPort } from '../connectors/maximo/mock.ts';
+import type { MaximoReadPort } from '../connectors/maximo/port.ts';
+import type { AppConfig } from '../config.ts';
+import { DEMO_ASSETS, DEMO_CONTRACT_KPI_SET, DEMO_REPORT, DEMO_SCOPE, DEMO_WORK_ORDERS } from '../demo.ts';
+import { OpenAiCompatibleGateway } from '../llm/openai-compatible.ts';
+import type { SqlDatabase } from '../persistence/sql.ts';
+import { InMemoryReportStore, type ReportStore } from '../reporting/store.ts';
+import type { ApiDependencies } from '../api/router.ts';
+
+/**
+ * Composition root. Builds every port and adapter from configuration so the
+ * server, tests and scripts share one wiring. Domain modules never read the
+ * environment themselves.
+ */
+export interface Application {
+  api: ApiDependencies;
+  runtime: AgentRuntime;
+  close(): Promise<void>;
+}
+
+export interface ComposeOverrides {
+  /** Supplied by the host when DATABASE_URL is set (keeps `pg` out of the domain layer). */
+  database?: SqlDatabase;
+  maximo?: MaximoReadPort;
+  modelGateway?: ModelGateway | null;
+  now?: () => string;
+}
+
+export async function composeApplication(config: AppConfig, overrides: ComposeOverrides = {}): Promise<Application> {
+  let auditLog: AuditLog;
+  let memoryStore: MemoryStore;
+  let reportStore: ReportStore;
+  let persistence: ApiDependencies['persistence'] = 'in-memory';
+  let close: () => Promise<void> = async () => {};
+
+  if (overrides.database) {
+    const { PgAuditLog, PgMemoryStore, PgReportStore, ensureSchema } = await import('../persistence/postgres.ts');
+    await ensureSchema(overrides.database);
+    auditLog = new PgAuditLog(overrides.database);
+    memoryStore = new PgMemoryStore(overrides.database);
+    reportStore = new PgReportStore(overrides.database);
+    persistence = 'postgres';
+    const db = overrides.database;
+    close = () => db.close();
+  } else {
+    auditLog = new InMemoryAuditLog();
+    memoryStore = new InMemoryMemoryStore();
+    reportStore = new InMemoryReportStore();
+  }
+
+  const maximo: MaximoReadPort = overrides.maximo
+    ?? (config.maximo.baseUrl
+      ? new MaximoRestClient({ baseUrl: config.maximo.baseUrl, apiKey: config.maximo.apiKey, objectStructures: config.maximo.objectStructures })
+      : new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS }));
+  const contract = new InMemoryContractReadPort([DEMO_CONTRACT_KPI_SET]);
+
+  const modelGateway: ModelGateway | null = overrides.modelGateway !== undefined
+    ? overrides.modelGateway
+    : (config.llm.baseUrl ? new OpenAiCompatibleGateway({ baseUrl: config.llm.baseUrl, model: config.llm.model, apiKey: config.llm.apiKey }) : null);
+
+  const runtime = new AgentRuntime({
+    catalog: AGENT_CATALOG,
+    tools: buildStandardTools({ maximo, contract, memory: memoryStore }),
+    handlers: createStandardHandlers(DEMO_SCOPE),
+    auditLog,
+    memoryStore,
+    modelGateway,
+    modelPolicy: { baseUrl: config.llm.baseUrl, remoteApprovedForInternal: config.llm.remoteApprovedForInternal, remoteApprovedForConfidential: config.llm.remoteApprovedForConfidential },
+    now: overrides.now,
+  });
+
+  return {
+    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined },
+    runtime,
+    close,
+  };
+}

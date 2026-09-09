@@ -68,6 +68,11 @@ export interface AgentDefinition {
   allowedToolIds: readonly string[];
   /** LLM use is optional. Deterministic agents can set this to false. */
   mayUseModel: boolean;
+  /**
+   * Minimum risk class per capability. The kernel escalates a task to at least
+   * this class, so a caller cannot downgrade a contractual output to routine.
+   */
+  minimumRiskClass?: Readonly<Record<string, RiskClass>>;
 }
 
 export interface HumanApproval {
@@ -125,4 +130,38 @@ export interface ModelResponse {
  */
 export interface ModelGateway {
   generate(request: ModelRequest): Promise<ModelResponse>;
+}
+
+/** Classification of the data an agent run handles. Drives model-invocation policy. */
+export type DataClassification = 'synthetic' | 'internal' | 'confidential';
+
+export interface ToolCallRecord {
+  toolId: string;
+  at: string;
+  /** Short, non-sensitive description of the call (no payloads). */
+  summary: string;
+}
+
+export type AgentRunStatus = 'completed' | 'blocked' | 'failed';
+
+/**
+ * Full record of one governed agent run: what was planned, which approved
+ * tools were called, whether a model was used, the grounded output, and the
+ * release decision. Every field is reproducible from the audit trail.
+ */
+export interface AgentRunRecord {
+  runId: string;
+  task: AgentTask;
+  agentId: string | null;
+  status: AgentRunStatus;
+  classification: DataClassification;
+  startedAt: string;
+  completedAt: string;
+  toolCalls: readonly ToolCallRecord[];
+  modelUsed: boolean;
+  output: GroundedAgentOutput<unknown> | null;
+  approvalRequired: boolean;
+  releaseReady: boolean;
+  reason: string;
+  auditSequences: readonly number[];
 }

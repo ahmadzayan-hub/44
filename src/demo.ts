@@ -1,5 +1,6 @@
 import type { EvidenceRef } from './agent-os/contracts.ts';
-import type { MaximoWorkOrderRecord } from './connectors/maximo/port.ts';
+import type { ContractKpiSet } from './connectors/contract/port.ts';
+import type { MaximoAssetRecord, MaximoWorkOrderRecord } from './connectors/maximo/port.ts';
 import { DEMO_KPI_DEFINITIONS } from './kpi/demo-definitions.ts';
 import { computeKpiObservation } from './kpi/engine.ts';
 import { buildReportPackage, deterministicExecutiveSummary } from './reporting/generator.ts';
@@ -43,3 +44,22 @@ export const DEMO_REPORT = buildReportPackage({
 });
 
 export const DEMO_SUMMARY = deterministicExecutiveSummary(DEMO_REPORT);
+
+export const DEMO_ASSETS: readonly MaximoAssetRecord[] = [
+  { assetId: 'ATC-ZC-01', name: 'Zone controller 01', assetClass: 'Signalling / ATC', location: 'Metro line', status: 'OPERATING', criticality: 'high' },
+  { assetId: 'ATC-ZC-02', name: 'Zone controller 02', assetClass: 'Signalling / ATC', location: 'Metro line', status: 'OPERATING', criticality: 'high' },
+  { assetId: 'TRAM-APS-03', name: 'APS segment 03', assetClass: 'Traction power', location: 'Tram', status: 'OPERATING', criticality: 'medium' },
+];
+
+/** Demo scope used by the composition root when a task carries no explicit scope. */
+export const DEMO_SCOPE = { contractId: 'DEMO-CONTRACT', periodStart, periodEnd, priorBreachesByKpi: { mttr: 2 } } as const;
+
+/** DEMO ONLY approved-definition set served through the contract port. */
+export const DEMO_CONTRACT_KPI_SET: ContractKpiSet = {
+  contractId: 'DEMO-CONTRACT',
+  definitionVersion: 'demo-v1',
+  definitions: DEMO_KPI_DEFINITIONS,
+  plannedServiceMinutesPerPeriod: (start, end) => Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 60_000)),
+  assetIds: DEMO_ASSETS.map((asset) => asset.assetId),
+  evidence: { sourceSystem: 'contract_repository', entityType: 'kpi-definition-set', entityId: 'DEMO-CONTRACT/demo-v1', observedAt: periodStart },
+};

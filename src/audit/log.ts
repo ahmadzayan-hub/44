@@ -14,13 +14,19 @@ export type AuditAction =
   | 'report.reset'
   | 'agent.run_planned'
   | 'agent.run_blocked'
+  | 'agent.run_started'
+  | 'agent.run_completed'
+  | 'agent.run_failed'
+  | 'tool.called'
+  | 'model.invoked'
+  | 'model.blocked'
   | 'proposal.created';
 
 export interface AuditEventInput {
   action: AuditAction;
   actorId: string;
   actorRole?: string;
-  subjectType: 'report' | 'task' | 'proposal';
+  subjectType: 'report' | 'task' | 'proposal' | 'run';
   subjectId: string;
   at: string;
   fromState?: string;

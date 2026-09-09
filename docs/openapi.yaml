@@ -1,0 +1,90 @@
+openapi: 3.1.0
+info:
+  title: RailMind Agent OS decision API
+  version: 0.4.0
+  description: >-
+    Local decision API for the P0 synthetic demo. Mutates RailMind-owned state only
+    (report status, audit trail, agent memory). Never writes to Maximo, finance or
+    contract systems. No authentication in P0: the named actor is caller-supplied.
+servers:
+  - url: http://localhost:4173
+paths:
+  /api/health:
+    get:
+      summary: Service status, persistence mode, dependency probe and available capabilities
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Dependency probe failed }
+  /api/report:
+    get:
+      summary: Current report package, readiness and its audit trail
+      responses:
+        '200': { description: Report view }
+  /api/report/transition:
+    post:
+      summary: Execute a report state-machine transition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, actorId]
+              properties:
+                type: { type: string, enum: [submit_for_review, approve, reject, lock] }
+                actorId: { type: string }
+                actorRole: { type: string }
+                note: { type: string, description: Required to approve with a critical exception or to reject }
+                at: { type: string, format: date-time }
+      responses:
+        '200': { description: Transition applied and audited }
+        '409': { description: Transition refused; blockers returned and refusal audited }
+  /api/report/reset:
+    post:
+      summary: Restore the demo package (audited)
+      responses:
+        '200': { description: Restored }
+  /api/agent/task:
+    post:
+      summary: Plan a task through the kernel without executing it (audited)
+      responses:
+        '200': { description: Plan }
+        '403': { description: Blocked by routing or policy }
+  /api/agent/run:
+    post:
+      summary: Execute a governed agent run through the orchestrator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capability, actorId, goal, riskClass, actionMode]
+              properties:
+                capability: { type: string }
+                actorId: { type: string }
+                goal: { type: string }
+                riskClass: { type: string, enum: [routine, operational, contractual, financial, safety_critical] }
+                actionMode: { type: string, enum: [read, analyse, draft, propose_write, execute_write, control] }
+                context:
+                  type: object
+                  description: Optional analysis scope (contractId, periodStart, periodEnd, priorBreachesByKpi)
+      responses:
+        '200': { description: Completed run record with grounded output }
+        '403': { description: Blocked by routing or policy }
+        '422': { description: Run failed (tool boundary, missing evidence, handler error) }
+  /api/runs:
+    get:
+      summary: Run records of this process
+      responses:
+        '200': { description: Runs }
+  /api/audit:
+    get:
+      summary: All audit events with hash-chain verification
+      responses:
+        '200': { description: Events and chain status }
+  /api/agents:
+    get:
+      summary: Registered agent catalog
+      responses:
+        '200': { description: Catalog }

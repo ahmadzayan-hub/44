@@ -118,3 +118,29 @@ test('API reset restores the seed and is itself audited', async () => {
     assert.equal(denied.status, 400);
   } finally { await api.close(); }
 });
+
+test('API executes a governed agent run through the composition root and audits it', async () => {
+  const { composeApplication } = await import('../src/app/compose.ts');
+  const { loadConfig } = await import('../src/config.ts');
+  const app = await composeApplication(loadConfig({}), { now: () => '2026-09-09T12:00:00Z' });
+  const handler = createApiHandler(app.api);
+  const server = createServer(async (req, res) => { if (await handler(req, res)) return; res.writeHead(404); res.end(); });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  try {
+    const health = await (await fetch(`${base}/api/health`)).json() as { capabilities: string[] };
+    assert.ok(health.capabilities.includes('maintenance-kpi'));
+    const run = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capability: 'maintenance-kpi', actorId: 'engineer-1', goal: 'KPIs', riskClass: 'operational', actionMode: 'analyse' }) });
+    assert.equal(run.status, 200);
+    const record = await run.json() as { status: string; releaseReady: boolean; toolCalls: unknown[]; auditSequences: number[] };
+    assert.equal(record.status, 'completed');
+    assert.equal(record.releaseReady, true);
+    assert.equal(record.toolCalls.length, 4);
+    const blocked = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capability: 'asset-health', actorId: 'engineer-1', goal: 'x', riskClass: 'operational', actionMode: 'control' }) });
+    assert.equal(blocked.status, 403);
+    const runs = await (await fetch(`${base}/api/runs`)).json() as { runs: unknown[] };
+    assert.equal(runs.runs.length, 2);
+    const audit = await (await fetch(`${base}/api/audit`)).json() as { chain: { valid: boolean } };
+    assert.equal(audit.chain.valid, true);
+  } finally { await new Promise<void>((resolve) => server.close(() => resolve())); await app.close(); }
+});

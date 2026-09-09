@@ -36,6 +36,7 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = [
     allowedActionModes: ['read', 'analyse', 'draft'],
     allowedToolIds: ['maximo.read', 'finance.read', 'contract.read', 'memory.read'],
     mayUseModel: true,
+    minimumRiskClass: { 'monthly-report': 'contractual', 'quarterly-report': 'contractual', 'annual-report': 'contractual' },
   },
   {
     id: 'executive-briefing',
@@ -45,6 +46,7 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = [
     allowedActionModes: ['read', 'analyse', 'draft'],
     allowedToolIds: ['memory.read', 'contract.read'],
     mayUseModel: true,
+    minimumRiskClass: { 'executive-briefing': 'contractual' },
   },
   {
     id: 'contract-context',
@@ -54,6 +56,7 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = [
     allowedActionModes: ['read', 'analyse', 'draft'],
     allowedToolIds: ['contract.read'],
     mayUseModel: true,
+    minimumRiskClass: { 'contract-context': 'contractual' },
   },
   {
     id: 'finance-context',
@@ -63,5 +66,6 @@ export const AGENT_CATALOG: readonly AgentDefinition[] = [
     allowedActionModes: ['read', 'analyse', 'draft'],
     allowedToolIds: ['finance.read'],
     mayUseModel: false,
+    minimumRiskClass: { 'finance-context': 'financial' },
   },
 ] as const;
