@@ -1,13 +1,13 @@
 entrypoint = "server.mjs"
 language = "javascript"
-run = "npm run serve"
+run = "PORT=5000 npm run serve"
 onBoot = "npm ci"
 hidden = ["node_modules"]
 
 [[ports]]
-localPort = 4173
+localPort = 5000
 externalPort = 80
 
 [deployment]
 build = "npm ci && npm run verify"
-run = "npm start"
+run = "PORT=5000 npm start"
