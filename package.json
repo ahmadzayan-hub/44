@@ -8,7 +8,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "check:web": "node --check web/app.js",
-    "verify": "npm run typecheck && npm run check:web && npm test",
+    "check:portfolio": "node scripts/check-portfolio.mjs",
+    "verify": "npm run typecheck && npm run check:web && npm run check:portfolio && npm test",
     "serve": "node server.mjs"
   },
   "devDependencies": {

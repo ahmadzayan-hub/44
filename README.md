@@ -35,9 +35,10 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - governed multi-agent kernel and memory abstraction
 - Control Tower view model
 - Arabic-first bilingual Control Tower preview with English toggle, responsive navigation, evidence drawers and human-review safeguards
+- deterministic schedule-adjusted expenditure-pace distribution model with P25 / P50 / P75 portfolio planning scenarios
 - local verification and static preview smoke test, with a GitHub Actions activation template
 
-> **Important:** KPI formulas and thresholds included in the demo are synthetic examples only. They are not RTA contractual definitions and must be replaced by formally approved rules before production.
+> **Important:** KPI formulas and thresholds included in the demo are synthetic examples only. They are not RTA contractual definitions and must be replaced by formally approved rules before production. The portfolio forecast is exploratory decision support, not a committed budget, cash forecast or contractual entitlement.
 
 ## Run
 
