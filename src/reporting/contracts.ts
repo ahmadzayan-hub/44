@@ -47,10 +47,21 @@ export interface ReportPackage {
   status: ReportStatus;
   /** Set when the package is submitted for named review. */
   reviewRequestedAt?: string;
-  /** Named human decision recorded at approval or rejection. */
-  approval?: HumanApproval;
+  /** Named human decision recorded at approval or rejection, bound to the evidence it was given for. */
+  approval?: ReportApproval;
   /** Set when the approved package is locked for the period. */
   lockedAt?: string;
+  /** Fingerprint of the KPI values, formula versions and evidence the package currently carries. */
+  evidenceVersion?: string;
+  /** Why and when the package was superseded; the package then needs revision. */
+  supersession?: { at: string; reason: string; previousEvidenceVersion: string; actorId: string };
 }
 
-export type ReportStatus = 'draft' | 'under_review' | 'approved' | 'locked';
+export interface ReportApproval extends HumanApproval {
+  /** Evidence version the reviewer saw when deciding. */
+  evidenceVersion: string;
+  /** KPI id to formula version at decision time. */
+  formulaVersions: Readonly<Record<string, string>>;
+}
+
+export type ReportStatus = 'draft' | 'under_review' | 'approved' | 'rejected' | 'superseded' | 'locked';

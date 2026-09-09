@@ -40,11 +40,11 @@ test('audit log rejects anonymous or undated events', async () => {
 
 test('report transitions produce audit events that reconstruct the decision trail', async () => {
   const log = new InMemoryAuditLog();
-  const submitted = transitionReport(DEMO_REPORT, { type: 'submit_for_review', actorId: 'engineer-1', actorRole: 'Reliability Engineer', at: '2026-09-01T08:00:00Z' });
+  const submitted = transitionReport(DEMO_REPORT, { type: 'submit_for_review', actorId: 'engineer-1', actorRole: 'Reliability Engineer', at: '2026-09-01T08:00:00Z', evidenceVersion: 'ev-1' });
   await log.append(submitted.audit);
-  const refused = transitionReport(submitted.report, { type: 'approve', approval: { reviewerId: 'mgr-1', reviewerRole: 'Manager', decision: 'approved', at: '2026-09-02T09:00:00Z' } });
+  const refused = transitionReport(submitted.report, { type: 'approve', approval: { reviewerId: 'mgr-1', reviewerRole: 'Manager', decision: 'approved', at: '2026-09-02T09:00:00Z' }, evidenceVersion: 'ev-1' });
   await log.append(refused.audit);
-  const approved = transitionReport(submitted.report, { type: 'approve', approval: { reviewerId: 'mgr-1', reviewerRole: 'Manager', decision: 'approved', at: '2026-09-02T09:30:00Z', note: 'Mitigation reviewed.' } });
+  const approved = transitionReport(submitted.report, { type: 'approve', approval: { reviewerId: 'mgr-1', reviewerRole: 'Manager', decision: 'approved', at: '2026-09-02T09:30:00Z', note: 'Mitigation reviewed.' }, evidenceVersion: 'ev-1' });
   await log.append(approved.audit);
 
   const trail = await log.bySubject('report', DEMO_REPORT.reportId);

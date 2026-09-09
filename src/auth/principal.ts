@@ -89,11 +89,13 @@ export function inScope(principal: Principal, required: Scope): boolean {
 }
 
 /** Maps report transitions to the permission they require. */
-export const TRANSITION_PERMISSION: Readonly<Record<'submit_for_review' | 'approve' | 'reject' | 'lock', Permission>> = {
+export const TRANSITION_PERMISSION: Readonly<Record<'submit_for_review' | 'approve' | 'reject' | 'lock' | 'supersede' | 'revise', Permission>> = {
   submit_for_review: 'report.submit',
   approve: 'report.approve',
   reject: 'report.reject',
   lock: 'report.lock',
+  supersede: 'report.approve',
+  revise: 'report.submit',
 };
 
 /** Capability groups drive the run permission a capability needs. */

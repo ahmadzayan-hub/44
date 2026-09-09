@@ -1,4 +1,5 @@
 import type { AuditEvent, AuditLog } from '../audit/log.ts';
+import type { DecisionLedger } from '../ledger/contracts.ts';
 import { evaluateModelInvocation, type ModelInvocationPolicyConfig } from '../llm/policy.ts';
 import type {
   AgentDefinition,
@@ -33,12 +34,25 @@ export interface AgentRuntimeDependencies {
   memoryStore: MemoryStore;
   modelGateway: ModelGateway | null;
   modelPolicy: ModelInvocationPolicyConfig;
+  /** Optional append-only ledger; every completed run records a recommendation entry. */
+  ledger?: DecisionLedger;
   now?: () => string;
   runId?: () => string;
 }
 
 export interface RunOptions {
   classification?: DataClassification;
+}
+
+/** Pulls KPI id to formula version pairs out of a handler value when it carries KPI observations. */
+function extractKpiVersions(value: unknown): Readonly<Record<string, string>> {
+  if (typeof value !== 'object' || value === null) return {};
+  const record = value as { kpis?: unknown; definitionVersion?: unknown };
+  if (Array.isArray(record.kpis)) {
+    const pairs = record.kpis.flatMap((kpi) => (typeof kpi === 'object' && kpi !== null && typeof (kpi as { id?: unknown }).id === 'string' && typeof (kpi as { formulaVersion?: unknown }).formulaVersion === 'string' ? [[(kpi as { id: string }).id, (kpi as { formulaVersion: string }).formulaVersion] as const] : []));
+    if (pairs.length > 0) return Object.fromEntries(pairs);
+  }
+  return typeof record.definitionVersion === 'string' ? { '*': record.definitionVersion } : {};
 }
 
 export class AgentRuntime {
@@ -131,6 +145,11 @@ export class AgentRuntime {
         ? 'Output is grounded; named human approval is required before release.'
         : 'Output is grounded and within the read/analysis boundary.';
       await audit({ action: 'agent.run_completed', at: output.generatedAt, toState: releaseReady ? 'release_ready' : 'awaiting_approval', reason: `${reason} tools=${toolCalls.length} model=${Boolean(result.modelUsed)} evidence=${output.evidence.length}`, evidence: output.evidence.slice(0, 50) });
+      if (this.#deps.ledger) {
+        const kpiVersions = extractKpiVersions(result.value);
+        const completedEvent = sequences[sequences.length - 1];
+        await this.#deps.ledger.append({ kind: 'recommendation', subjectType: 'run', subjectId: runId, at: output.generatedAt, actorId: task.actorId, payload: { capability: task.capability, agentId: plan.agent.id, goal: task.goal, assumptions: output.assumptions, releaseReady, approvalRequired: plan.policy.approvalRequired, value: output.value }, evidence: output.evidence, kpiVersions, auditSequence: completedEvent });
+      }
       await this.#deps.memoryStore.append({
         id: `${runId}:decision`,
         kind: 'decision',

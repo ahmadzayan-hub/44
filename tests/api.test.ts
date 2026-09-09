@@ -9,11 +9,13 @@ import { InMemoryAuditLog } from '../src/audit/log.ts';
 import { DemoTokenDirectory } from '../src/auth/token-directory.ts';
 import { DEMO_REPORT } from '../src/demo.ts';
 import { InMemoryReportStore } from '../src/reporting/store.ts';
+import { InMemoryDecisionLedger } from '../src/ledger/contracts.ts';
 
 async function startApi() {
   const auditLog = new InMemoryAuditLog();
   const memoryStore = new InMemoryMemoryStore();
-  const handler = createApiHandler({ reportStore: new InMemoryReportStore(), auditLog, memoryStore, seedReport: DEMO_REPORT, persistence: 'in-memory', now: () => '2026-09-09T12:00:00Z', tokenDirectory: new DemoTokenDirectory() });
+  const ledger = new InMemoryDecisionLedger();
+  const handler = createApiHandler({ reportStore: new InMemoryReportStore(), auditLog, memoryStore, ledger, seedReport: DEMO_REPORT, persistence: 'in-memory', now: () => '2026-09-09T12:00:00Z', tokenDirectory: new DemoTokenDirectory() });
   const server = createServer(async (req, res) => {
     if (await handler(req, res)) return;
     res.writeHead(404); res.end();
@@ -26,7 +28,7 @@ async function startApi() {
     const response = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     return { status: response.status, json: await response.json() as Record<string, any> };
   };
-  return { call, auditLog, memoryStore, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  return { call, auditLog, memoryStore, ledger, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
 }
 
 test('API serves the seeded report with readiness and an empty audit trail', async () => {
@@ -76,7 +78,53 @@ test('API drives the full approval lifecycle and records a valid audit chain', a
     const audit = await api.call('GET', '/api/audit');
     assert.deepEqual(audit.json.chain, { valid: true });
     assert.equal(audit.json.events[3].previousHash, audit.json.events[2].hash);
+
+    const ledger = await api.call('GET', '/api/ledger?subjectType=report&subjectId=DEMO-2026-08');
+    assert.deepEqual(ledger.json.records.map((r: { kind: string }) => r.kind), ['review', 'approval', 'report_release']);
+    const approval = ledger.json.records[1];
+    assert.equal(approval.actorId, 'demo.approver');
+    assert.equal(approval.evidenceVersion, approved.json.evidenceVersion);
+    assert.equal(approval.kpiVersions.mttr, 'demo-v1');
+    assert.ok(approval.evidence.length > 0);
+    const trace = await api.call('GET', `/api/ledger/${approval.ledgerId}/trace`);
+    assert.equal(trace.status, 200);
+    assert.ok(trace.json.sources.length > 0);
+    assert.equal(trace.json.supersededBy, null);
   } finally { await api.close(); }
+});
+
+test('API supersedes an approval automatically when the evidence behind it changes', async () => {
+  const auditLog = new InMemoryAuditLog();
+  const ledger = new InMemoryDecisionLedger();
+  const reportStore = new InMemoryReportStore();
+  const { ControlTowerService } = await import('../src/app/control-tower-service.ts');
+  const { createSyntheticProviders } = await import('../src/providers/synthetic.ts');
+  const { DEMO_ASSETS, DEMO_CONDITION_PROFILES, DEMO_CONTRACT_KPI_SET, DEMO_PM_RECORDS, DEMO_SCOPE, DEMO_WORK_ORDERS } = await import('../src/demo.ts');
+  const workOrders = [...DEMO_WORK_ORDERS];
+  const providers = createSyntheticProviders({ assets: DEMO_ASSETS, workOrders, preventiveMaintenance: DEMO_PM_RECORDS, conditionProfiles: DEMO_CONDITION_PROFILES, kpiSets: [DEMO_CONTRACT_KPI_SET] });
+  const mutable = { ...providers, maintenance: { ...providers.maintenance, listWorkOrders: async (ids: readonly string[], since: string) => { const rows = await createSyntheticProviders({ assets: DEMO_ASSETS, workOrders, preventiveMaintenance: DEMO_PM_RECORDS, conditionProfiles: DEMO_CONDITION_PROFILES, kpiSets: [DEMO_CONTRACT_KPI_SET] }).maintenance.listWorkOrders(ids, since); return rows; } } };
+  const controlTower = new ControlTowerService(mutable, reportStore, DEMO_REPORT, () => '2026-09-09T12:00:00Z');
+  const handler = createApiHandler({ reportStore, auditLog, memoryStore: new InMemoryMemoryStore(), ledger, seedReport: DEMO_REPORT, persistence: 'in-memory', now: () => '2026-09-09T12:00:00Z', tokenDirectory: new DemoTokenDirectory(), controlTower, scope: DEMO_SCOPE, mode: 'synthetic' });
+  const server = createServer(async (req, res) => { if (await handler(req, res)) return; res.writeHead(404); res.end(); });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const call = async (method: string, path: string, body: unknown, token: string) => { const response = await fetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: body === undefined ? undefined : JSON.stringify(body) }); return { status: response.status, json: await response.json() as Record<string, any> }; };
+  try {
+    await call('POST', '/api/report/transition', { type: 'submit_for_review' }, 'demo-engineer');
+    const approved = await call('POST', '/api/report/transition', { type: 'approve', note: 'Reviewed.' }, 'demo-approver');
+    assert.equal(approved.json.report.status, 'approved');
+    // Source changes: WO-1004 closes with a longer repair. The evidence version moves.
+    workOrders[3] = { ...workOrders[3]!, status: 'COMP', completedAt: '2026-09-02T06:00:00Z', downtimeMinutes: 400 };
+    const view = await call('GET', '/api/report', undefined, 'demo-viewer');
+    assert.equal(view.json.report.status, 'superseded');
+    assert.match(view.json.report.supersession.reason, /evidence changed/i);
+    assert.equal(view.json.readiness.nextTransitions[0], 'revise');
+    const events = (await auditLog.all()).map((e) => e.action);
+    assert.ok(events.includes('report.superseded'));
+    const ledgerRows = await ledger.bySubject('report', 'DEMO-2026-08');
+    assert.equal(ledgerRows[ledgerRows.length - 1]?.kind, 'supersession');
+    assert.equal(ledgerRows[ledgerRows.length - 1]?.actorId, 'system.evidence-monitor');
+  } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
 });
 
 test('API refuses unauthenticated, under-privileged and malformed requests without touching the report', async () => {

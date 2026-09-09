@@ -44,6 +44,30 @@ CREATE TABLE IF NOT EXISTS railmind_memory_records (
 CREATE INDEX IF NOT EXISTS railmind_memory_records_task_idx ON railmind_memory_records (task_id);
 CREATE INDEX IF NOT EXISTS railmind_memory_records_kind_idx ON railmind_memory_records (kind);
 
+-- Decision and evidence ledger: append-only, immutable by trigger.
+CREATE TABLE IF NOT EXISTS railmind_ledger (
+  sequence         BIGINT PRIMARY KEY,
+  ledger_id        TEXT NOT NULL UNIQUE,
+  kind             TEXT NOT NULL,
+  subject_type     TEXT NOT NULL,
+  subject_id       TEXT NOT NULL,
+  at               TIMESTAMPTZ NOT NULL,
+  actor_id         TEXT NOT NULL,
+  actor_role       TEXT,
+  payload          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  evidence         JSONB NOT NULL DEFAULT '[]'::jsonb,
+  kpi_versions     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  evidence_version TEXT,
+  supersedes       TEXT REFERENCES railmind_ledger (ledger_id),
+  follows          TEXT REFERENCES railmind_ledger (ledger_id),
+  audit_sequence   BIGINT,
+  recorded_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS railmind_ledger_subject_idx ON railmind_ledger (subject_type, subject_id, sequence);
+DROP TRIGGER IF EXISTS railmind_ledger_no_update ON railmind_ledger;
+CREATE TRIGGER railmind_ledger_no_update
+  BEFORE UPDATE OR DELETE ON railmind_ledger
+  FOR EACH ROW EXECUTE FUNCTION railmind_audit_immutable();
 CREATE TABLE IF NOT EXISTS railmind_reports (
   report_id  TEXT PRIMARY KEY,
   status     TEXT NOT NULL,

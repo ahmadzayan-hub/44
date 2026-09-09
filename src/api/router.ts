@@ -8,7 +8,9 @@ import { TRANSITION_PERMISSION, hasPermission, inScope, permissionsOf, runPermis
 import type { TokenDirectory } from '../auth/token-directory.ts';
 import { securityHeaders } from '../http/security-headers.ts';
 import type { AuditLog } from '../audit/log.ts';
-import { reportReadiness, transitionReport, type ReportTransition } from '../reporting/approval.ts';
+import type { DecisionLedger } from '../ledger/contracts.ts';
+import { computeEvidenceVersion, formulaVersionsOf } from '../reporting/evidence-version.ts';
+import { approvalInvalidated, reportReadiness, transitionReport, type ReportTransition } from '../reporting/approval.ts';
 import type { ReportPackage } from '../reporting/contracts.ts';
 import type { ReportStore } from '../reporting/store.ts';
 
@@ -37,6 +39,8 @@ export interface ApiDependencies {
   healthCheck?: () => Promise<void>;
   /** Bearer-token directory. Required: there is no unauthenticated mode. */
   tokenDirectory: TokenDirectory;
+  /** Decision and evidence ledger (append-only). */
+  ledger?: DecisionLedger;
   /** Control Tower application service and default scope. */
   controlTower?: ControlTowerService;
   scope?: TowerScope;
@@ -100,30 +104,27 @@ function str(body: Record<string, unknown>, key: string): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-function buildTransition(body: Record<string, unknown>, now: string, principal: Principal): ReportTransition {
+function buildTransition(body: Record<string, unknown>, now: string, principal: Principal, evidenceVersion: string): ReportTransition {
   const type = str(body, 'type');
   const actorId = principal.principalId;
   const actorRole = principal.role;
   const at = str(body, 'at') ?? now;
   const note = str(body, 'note');
+  const approval: HumanApproval = { reviewerId: actorId, reviewerRole: actorRole, decision: type === 'approve' ? 'approved' : 'rejected', at, note };
   switch (type) {
     case 'submit_for_review':
-      return { type, actorId, actorRole, at };
+      return { type, actorId, actorRole, at, evidenceVersion };
     case 'lock':
+    case 'revise':
       return { type, actorId, actorRole, at };
     case 'approve':
-    case 'reject': {
-      const approval: HumanApproval = {
-        reviewerId: actorId,
-        reviewerRole: actorRole ?? '',
-        decision: type === 'approve' ? 'approved' : 'rejected',
-        at,
-        note,
-      };
+      return { type, approval, evidenceVersion };
+    case 'reject':
       return { type, approval };
-    }
+    case 'supersede':
+      return { type, actorId, actorRole, at, reason: note ?? 'Superseded by the reviewer.', newEvidenceVersion: evidenceVersion };
     default:
-      throw new HttpError(400, 'Unknown transition type. Use submit_for_review, approve, reject or lock.');
+      throw new HttpError(400, 'Unknown transition type. Use submit_for_review, approve, reject, lock, supersede or revise.');
   }
 }
 
@@ -187,10 +188,45 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
     return deps.seedReport;
   }
 
+  /** The package's live KPI observations (through the governed pipeline when the service is configured). */
+  async function currentKpis(): Promise<ReportPackage['kpis']> {
+    if (deps.controlTower && deps.scope) {
+      const dto = await deps.controlTower.build(deps.scope);
+      const stored = await currentReport();
+      return stored.kpis.length === dto.kpis.length ? stored.kpis.map((kpi) => { const live = dto.kpis.find((k) => k.id === kpi.definition.id); return live ? { ...kpi, value: live.value, status: live.status, readiness: live.readiness, decisionGrade: live.decisionGrade, evidence: live.evidence.map((e) => ({ sourceSystem: e.sourceSystem, entityType: e.entityType, entityId: e.entityId, observedAt: e.observedAt })) } : kpi; }) : stored.kpis;
+    }
+    return (await currentReport()).kpis;
+  }
+
+  async function ledgerAppend(input: Parameters<DecisionLedger['append']>[0]): Promise<void> {
+    if (!deps.ledger) return;
+    await deps.ledger.append(input);
+  }
+
+  /**
+   * Approval invalidation: when the evidence behind an approved or in-review
+   * package changes, the package is superseded automatically and audited.
+   * Policy does not allow a stale approval to stand.
+   */
+  async function reconcileApproval(): Promise<{ report: ReportPackage; evidenceVersion: string }> {
+    const stored = await currentReport();
+    const kpis = await currentKpis();
+    const evidenceVersion = await computeEvidenceVersion(kpis);
+    if (!approvalInvalidated(stored, evidenceVersion)) return { report: stored, evidenceVersion };
+    const result = transitionReport({ ...stored, kpis }, { type: 'supersede', actorId: 'system.evidence-monitor', actorRole: 'system', at: now(), reason: `Underlying evidence changed (${(stored.approval?.evidenceVersion ?? stored.evidenceVersion ?? '').slice(0, 12)} -> ${evidenceVersion.slice(0, 12)}); approval invalidated by policy.`, newEvidenceVersion: evidenceVersion });
+    const audit = await deps.auditLog.append(result.audit);
+    if (result.ok) {
+      await deps.reportStore.save(result.report);
+      await ledgerAppend({ kind: 'supersession', subjectType: 'report', subjectId: stored.reportId, at: now(), actorId: 'system.evidence-monitor', actorRole: 'system', payload: { reason: result.audit.reason, previousStatus: stored.status }, evidence: kpis.flatMap((k) => k.evidence), kpiVersions: formulaVersionsOf(kpis), evidenceVersion, auditSequence: audit.sequence });
+    }
+    return { report: result.ok ? result.report : stored, evidenceVersion };
+  }
+
   async function reportView(): Promise<unknown> {
-    const report = await currentReport();
+    const { report, evidenceVersion } = await reconcileApproval();
     const audit = await deps.auditLog.bySubject('report', report.reportId);
-    return { report, readiness: reportReadiness(report), audit, persistence: deps.persistence };
+    const ledger = deps.ledger ? await deps.ledger.bySubject('report', report.reportId) : [];
+    return { report, readiness: reportReadiness(report, evidenceVersion), evidenceVersion, audit, ledger, persistence: deps.persistence };
   }
 
   async function route(method: string, path: string, req: ApiRequest): Promise<{ status: number; body: unknown }> {
@@ -249,16 +285,37 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
     }
     if (method === 'POST' && path === '/api/report/transition') {
       const body = await readJson(req);
-      const transition = buildTransition(body, now(), principal);
+      const { report, evidenceVersion } = await reconcileApproval();
+      const kpis = await currentKpis();
+      const transition = buildTransition(body, now(), principal, evidenceVersion);
       await require(principal, TRANSITION_PERMISSION[transition.type], deps.seedReport.reportId, contractScope());
-      const report = await currentReport();
-      const result = transitionReport(report, transition);
+      const result = transitionReport({ ...report, kpis }, transition);
       const audit = await deps.auditLog.append(result.audit);
-      if (result.ok) await deps.reportStore.save(result.report);
+      if (result.ok) {
+        await deps.reportStore.save(result.report);
+        const kindByType = { submit_for_review: 'review', approve: 'approval', reject: 'rejection', lock: 'report_release', supersede: 'supersession', revise: 'review' } as const;
+        await ledgerAppend({ kind: kindByType[transition.type], subjectType: 'report', subjectId: report.reportId, at: now(), actorId: principal.principalId, actorRole: principal.role, payload: { transition: transition.type, fromState: report.status, toState: result.report.status, note: str(body, 'note') ?? null, exceptions: result.report.exceptions.map((x) => ({ id: x.id, severity: x.severity })) }, evidence: kpis.flatMap((k) => k.evidence), kpiVersions: formulaVersionsOf(kpis), evidenceVersion, auditSequence: audit.sequence });
+      }
       return {
         status: result.ok ? 200 : 409,
-        body: { ok: result.ok, blockers: result.blockers, audit, report: result.report, readiness: reportReadiness(result.report) },
+        body: { ok: result.ok, blockers: result.blockers, audit, report: result.report, readiness: reportReadiness(result.report, evidenceVersion), evidenceVersion },
       };
+    }
+    if (method === 'GET' && path === '/api/ledger') {
+      await require(principal, 'ledger.read', 'ledger', contractScope());
+      if (!deps.ledger) throw new HttpError(503, 'No decision ledger is configured.');
+      const subjectType = query.get('subjectType');
+      const subjectId = query.get('subjectId');
+      const records = subjectType && subjectId ? await deps.ledger.bySubject(subjectType as 'report', subjectId) : await deps.ledger.all();
+      return { status: 200, body: { records, persistence: deps.persistence } };
+    }
+    if (method === 'GET' && path.startsWith('/api/ledger/') && path.endsWith('/trace')) {
+      await require(principal, 'ledger.read', 'ledger', contractScope());
+      if (!deps.ledger) throw new HttpError(503, 'No decision ledger is configured.');
+      const ledgerId = decodeURIComponent(path.slice('/api/ledger/'.length, -'/trace'.length));
+      const trace = await deps.ledger.trace(ledgerId);
+      if (!trace) throw new HttpError(404, `Ledger record ${ledgerId} not found.`);
+      return { status: 200, body: trace };
     }
     if (method === 'POST' && path === '/api/report/reset') {
       await readJson(req);

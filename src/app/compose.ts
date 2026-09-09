@@ -5,6 +5,7 @@ import { AgentRuntime } from '../agent-os/orchestrator.ts';
 import { buildStandardTools } from '../agent-os/standard-tools.ts';
 import { createStandardHandlers } from '../agents/index.ts';
 import { InMemoryAuditLog, type AuditLog } from '../audit/log.ts';
+import { InMemoryDecisionLedger, type DecisionLedger } from '../ledger/contracts.ts';
 import { createTokenDirectory } from '../auth/token-directory.ts';
 import { InMemoryConditionReadPort } from '../connectors/condition/port.ts';
 import { InMemoryContractReadPort } from '../connectors/contract/port.ts';
@@ -47,15 +48,17 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
   let auditLog: AuditLog;
   let memoryStore: MemoryStore;
   let reportStore: ReportStore;
+  let ledger: DecisionLedger;
   let persistence: ApiDependencies['persistence'] = 'in-memory';
   let close: () => Promise<void> = async () => {};
 
   if (overrides.database) {
-    const { PgAuditLog, PgMemoryStore, PgReportStore, ensureSchema } = await import('../persistence/postgres.ts');
+    const { PgAuditLog, PgDecisionLedger, PgMemoryStore, PgReportStore, ensureSchema } = await import('../persistence/postgres.ts');
     await ensureSchema(overrides.database);
     auditLog = new PgAuditLog(overrides.database);
     memoryStore = new PgMemoryStore(overrides.database);
     reportStore = new PgReportStore(overrides.database);
+    ledger = new PgDecisionLedger(overrides.database);
     persistence = 'postgres';
     const db = overrides.database;
     close = () => db.close();
@@ -63,6 +66,7 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
     auditLog = new InMemoryAuditLog();
     memoryStore = new InMemoryMemoryStore();
     reportStore = new InMemoryReportStore();
+    ledger = new InMemoryDecisionLedger();
   }
 
   /*
@@ -100,13 +104,14 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
     memoryStore,
     modelGateway,
     modelPolicy: { baseUrl: config.llm.baseUrl, remoteApprovedForInternal: config.llm.remoteApprovedForInternal, remoteApprovedForConfidential: config.llm.remoteApprovedForConfidential },
+    ledger,
     now: overrides.now,
   });
 
   const controlTower = new ControlTowerService(providers, reportStore, DEMO_REPORT, overrides.now);
 
   return {
-    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, tokenDirectory: createTokenDirectory(config.usersJson), healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined, controlTower, scope: DEMO_SCOPE, mode: providers.mode },
+    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, tokenDirectory: createTokenDirectory(config.usersJson), healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined, controlTower, scope: DEMO_SCOPE, mode: providers.mode, ledger },
     runtime,
     providers,
     controlTower,

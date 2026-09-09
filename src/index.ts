@@ -31,6 +31,8 @@ export * from './kpi/demo-definitions.ts';
 export * from './kpi/engine.ts';
 export * from './kpi/governed.ts';
 export * from './kpi/registry.ts';
+export * from './ledger/contracts.ts';
+export * from './reporting/evidence-version.ts';
 export * from './providers/contracts.ts';
 export * from './providers/production.ts';
 export * from './providers/synthetic.ts';

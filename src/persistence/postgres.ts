@@ -8,6 +8,7 @@ import {
   type AuditLog,
 } from '../audit/log.ts';
 import type { ReportPackage } from '../reporting/contracts.ts';
+import { buildTrace, validateLedgerInput, type DecisionLedger, type LedgerRecord, type LedgerRecordInput, type LedgerTrace } from '../ledger/contracts.ts';
 import type { ReportStore } from '../reporting/store.ts';
 import type { SqlClient, SqlDatabase, SqlRow } from './sql.ts';
 
@@ -56,6 +57,29 @@ CREATE TABLE IF NOT EXISTS railmind_memory_records (
 );
 CREATE INDEX IF NOT EXISTS railmind_memory_records_task_idx ON railmind_memory_records (task_id);
 CREATE INDEX IF NOT EXISTS railmind_memory_records_kind_idx ON railmind_memory_records (kind);
+CREATE TABLE IF NOT EXISTS railmind_ledger (
+  sequence         BIGINT PRIMARY KEY,
+  ledger_id        TEXT NOT NULL UNIQUE,
+  kind             TEXT NOT NULL,
+  subject_type     TEXT NOT NULL,
+  subject_id       TEXT NOT NULL,
+  at               TIMESTAMPTZ NOT NULL,
+  actor_id         TEXT NOT NULL,
+  actor_role       TEXT,
+  payload          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  evidence         JSONB NOT NULL DEFAULT '[]'::jsonb,
+  kpi_versions     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  evidence_version TEXT,
+  supersedes       TEXT REFERENCES railmind_ledger (ledger_id),
+  follows          TEXT REFERENCES railmind_ledger (ledger_id),
+  audit_sequence   BIGINT,
+  recorded_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS railmind_ledger_subject_idx ON railmind_ledger (subject_type, subject_id, sequence);
+DROP TRIGGER IF EXISTS railmind_ledger_no_update ON railmind_ledger;
+CREATE TRIGGER railmind_ledger_no_update
+  BEFORE UPDATE OR DELETE ON railmind_ledger
+  FOR EACH ROW EXECUTE FUNCTION railmind_audit_immutable();
 CREATE TABLE IF NOT EXISTS railmind_reports (
   report_id  TEXT PRIMARY KEY,
   status     TEXT NOT NULL,
@@ -244,5 +268,79 @@ export class PgReportStore implements ReportStore {
   async list(): Promise<readonly ReportPackage[]> {
     const result = await this.#db.query('SELECT package FROM railmind_reports ORDER BY report_id ASC');
     return result.rows.map(toReport);
+  }
+}
+
+const LEDGER_LOCK_KEY = 44_002;
+
+function jsonObject(row: SqlRow, key: string): Record<string, unknown> {
+  const value = row[key];
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value === 'string') { try { const parsed = JSON.parse(value); return typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {}; } catch { return {}; } }
+  return {};
+}
+
+function toLedgerRecord(row: SqlRow): LedgerRecord {
+  return {
+    ledgerId: text(row, 'ledger_id'),
+    sequence: Number(row.sequence),
+    kind: text(row, 'kind') as LedgerRecord['kind'],
+    subjectType: text(row, 'subject_type') as LedgerRecord['subjectType'],
+    subjectId: text(row, 'subject_id'),
+    at: isoDate(row, 'at'),
+    actorId: text(row, 'actor_id'),
+    actorRole: optionalText(row, 'actor_role'),
+    payload: jsonObject(row, 'payload'),
+    evidence: jsonArray<EvidenceRef>(row, 'evidence'),
+    kpiVersions: jsonObject(row, 'kpi_versions') as Record<string, string>,
+    evidenceVersion: optionalText(row, 'evidence_version'),
+    supersedes: optionalText(row, 'supersedes'),
+    follows: optionalText(row, 'follows'),
+    auditSequence: row.audit_sequence === null || row.audit_sequence === undefined ? undefined : Number(row.audit_sequence),
+  };
+}
+
+/** Append-only decision ledger in PostgreSQL; rows are immutable by trigger. */
+export class PgDecisionLedger implements DecisionLedger {
+  readonly #db: SqlDatabase;
+
+  constructor(db: SqlDatabase) {
+    this.#db = db;
+  }
+
+  async append(input: LedgerRecordInput): Promise<LedgerRecord> {
+    validateLedgerInput(input);
+    return this.#db.transaction(async (tx) => {
+      await tx.query('SELECT pg_advisory_xact_lock($1)', [LEDGER_LOCK_KEY]);
+      const last = await tx.query('SELECT sequence FROM railmind_ledger ORDER BY sequence DESC LIMIT 1');
+      const sequence = last.rows[0] ? Number(last.rows[0].sequence) + 1 : 1;
+      const ledgerId = `LED-${String(sequence).padStart(6, '0')}`;
+      await tx.query(
+        `INSERT INTO railmind_ledger (sequence, ledger_id, kind, subject_type, subject_id, at, actor_id, actor_role, payload, evidence, kpi_versions, evidence_version, supersedes, follows, audit_sequence)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12, $13, $14, $15)`,
+        [sequence, ledgerId, input.kind, input.subjectType, input.subjectId, input.at, input.actorId, input.actorRole ?? null, JSON.stringify(input.payload), JSON.stringify(input.evidence), JSON.stringify(input.kpiVersions), input.evidenceVersion ?? null, input.supersedes ?? null, input.follows ?? null, input.auditSequence ?? null],
+      );
+      return { ...input, ledgerId, sequence };
+    });
+  }
+
+  async get(ledgerId: string): Promise<LedgerRecord | null> {
+    const result = await this.#db.query('SELECT * FROM railmind_ledger WHERE ledger_id = $1', [ledgerId]);
+    return result.rows[0] ? toLedgerRecord(result.rows[0]) : null;
+  }
+
+  async bySubject(subjectType: LedgerRecordInput['subjectType'], subjectId: string): Promise<readonly LedgerRecord[]> {
+    const result = await this.#db.query('SELECT * FROM railmind_ledger WHERE subject_type = $1 AND subject_id = $2 ORDER BY sequence ASC', [subjectType, subjectId]);
+    return result.rows.map(toLedgerRecord);
+  }
+
+  async all(): Promise<readonly LedgerRecord[]> {
+    const result = await this.#db.query('SELECT * FROM railmind_ledger ORDER BY sequence ASC');
+    return result.rows.map(toLedgerRecord);
+  }
+
+  async trace(ledgerId: string): Promise<LedgerTrace | null> {
+    const record = await this.get(ledgerId);
+    return record ? buildTrace(record, await this.all()) : null;
   }
 }
