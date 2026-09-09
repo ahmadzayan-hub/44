@@ -10,7 +10,8 @@
     "check:web": "node --check web/app.js",
     "check:portfolio": "node scripts/check-portfolio.mjs",
     "verify": "npm run typecheck && npm run check:web && npm run check:portfolio && npm test",
-    "serve": "node server.mjs"
+    "serve": "node server.mjs",
+    "start": "node server.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2"

@@ -51,6 +51,10 @@ Open `http://localhost:4173`.
 
 The browser preview remains **illustrative only**. It is built from synthetic data and never sends an external write, creates a work order or changes a source system.
 
+## Replit
+
+The repository includes `.replit` and `replit.nix` configuration files for a Node.js 22 Replit environment. Import `ahmadzayan-hub/44` from GitHub, then select **Run**. Replit installs dependencies with `npm ci` and starts the application using `npm run serve` on port 4173. The deployment configuration runs `npm ci && npm run verify` before starting the same server with `npm start`.
+
 ## Architecture
 
 ```text
