@@ -1,3 +1,4 @@
+import type { ConditionReadPort } from '../connectors/condition/port.ts';
 import type { ContractReadPort } from '../connectors/contract/port.ts';
 import type { MaximoReadPort } from '../connectors/maximo/port.ts';
 import type { MemoryKind, MemoryStore } from './memory.ts';
@@ -18,10 +19,12 @@ export type MaximoReadInput =
 export interface ContractReadInput { contractId: string }
 export interface FinanceReadInput { contractId: string; since?: string }
 export interface MemoryReadInput { taskId?: string; kind?: MemoryKind }
+export type ConditionReadInput = { kind: 'profile'; assetId: string } | { kind: 'assetIds' };
 
 export interface StandardToolPorts {
   maximo?: MaximoReadPort;
   contract?: ContractReadPort;
+  condition?: ConditionReadPort;
   memory?: MemoryStore;
 }
 
@@ -60,6 +63,16 @@ export function buildStandardTools(ports: StandardToolPorts): ToolRegistry {
       readOnly: true,
       summarise: (input) => `kpi-set ${input.contractId}`,
       invoke: async (input) => contract.getKpiSet(input.contractId),
+    });
+  }
+  const condition = ports.condition;
+  if (condition) {
+    registry.register<ConditionReadInput, unknown>({
+      id: 'condition.read',
+      description: 'Read-only condition-monitoring profiles: health index, trend and condition signals.',
+      readOnly: true,
+      summarise: (input) => (input.kind === 'profile' ? `profile ${input.assetId}` : 'asset ids'),
+      invoke: async (input) => (input.kind === 'profile' ? condition.getProfile(input.assetId) : condition.listAssetIds()),
     });
   }
   const memory = ports.memory;

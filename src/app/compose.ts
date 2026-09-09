@@ -5,12 +5,14 @@ import { AgentRuntime } from '../agent-os/orchestrator.ts';
 import { buildStandardTools } from '../agent-os/standard-tools.ts';
 import { createStandardHandlers } from '../agents/index.ts';
 import { InMemoryAuditLog, type AuditLog } from '../audit/log.ts';
+import { createTokenDirectory } from '../auth/token-directory.ts';
+import { InMemoryConditionReadPort } from '../connectors/condition/port.ts';
 import { InMemoryContractReadPort } from '../connectors/contract/port.ts';
 import { MaximoRestClient } from '../connectors/maximo/client.ts';
 import { MockMaximoReadPort } from '../connectors/maximo/mock.ts';
 import type { MaximoReadPort } from '../connectors/maximo/port.ts';
 import type { AppConfig } from '../config.ts';
-import { DEMO_ASSETS, DEMO_CONTRACT_KPI_SET, DEMO_REPORT, DEMO_SCOPE, DEMO_WORK_ORDERS } from '../demo.ts';
+import { DEMO_ASSETS, DEMO_CONDITION_PROFILES, DEMO_CONTRACT_KPI_SET, DEMO_PM_RECORDS, DEMO_REPORT, DEMO_SCOPE, DEMO_WORK_ORDERS } from '../demo.ts';
 import { OpenAiCompatibleGateway } from '../llm/openai-compatible.ts';
 import type { SqlDatabase } from '../persistence/sql.ts';
 import { InMemoryReportStore, type ReportStore } from '../reporting/store.ts';
@@ -60,8 +62,9 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
   const maximo: MaximoReadPort = overrides.maximo
     ?? (config.maximo.baseUrl
       ? new MaximoRestClient({ baseUrl: config.maximo.baseUrl, apiKey: config.maximo.apiKey, objectStructures: config.maximo.objectStructures })
-      : new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS }));
+      : new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS, preventiveMaintenance: DEMO_PM_RECORDS }));
   const contract = new InMemoryContractReadPort([DEMO_CONTRACT_KPI_SET]);
+  const condition = new InMemoryConditionReadPort(DEMO_CONDITION_PROFILES);
 
   const modelGateway: ModelGateway | null = overrides.modelGateway !== undefined
     ? overrides.modelGateway
@@ -69,7 +72,7 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
 
   const runtime = new AgentRuntime({
     catalog: AGENT_CATALOG,
-    tools: buildStandardTools({ maximo, contract, memory: memoryStore }),
+    tools: buildStandardTools({ maximo, contract, condition, memory: memoryStore }),
     handlers: createStandardHandlers(DEMO_SCOPE),
     auditLog,
     memoryStore,
@@ -79,7 +82,7 @@ export async function composeApplication(config: AppConfig, overrides: ComposeOv
   });
 
   return {
-    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined },
+    api: { reportStore, auditLog, memoryStore, seedReport: DEMO_REPORT, persistence, runtime, classification: config.classification, now: overrides.now, tokenDirectory: createTokenDirectory(config.usersJson), healthCheck: overrides.database ? async () => { await overrides.database?.query('SELECT 1'); } : undefined },
     runtime,
     close,
   };

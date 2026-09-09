@@ -11,9 +11,10 @@ import { buildStandardTools } from '../src/agent-os/standard-tools.ts';
 import { ToolRegistry } from '../src/agent-os/tools.ts';
 import { createStandardHandlers } from '../src/agents/index.ts';
 import { InMemoryAuditLog } from '../src/audit/log.ts';
+import { InMemoryConditionReadPort } from '../src/connectors/condition/port.ts';
 import { InMemoryContractReadPort } from '../src/connectors/contract/port.ts';
 import { MockMaximoReadPort } from '../src/connectors/maximo/mock.ts';
-import { DEMO_ASSETS, DEMO_CONTRACT_KPI_SET, DEMO_SCOPE, DEMO_WORK_ORDERS } from '../src/demo.ts';
+import { DEMO_ASSETS, DEMO_CONDITION_PROFILES, DEMO_CONTRACT_KPI_SET, DEMO_PM_RECORDS, DEMO_SCOPE, DEMO_WORK_ORDERS } from '../src/demo.ts';
 
 function task(overrides: Partial<AgentTask> = {}): AgentTask {
   return { taskId: 'T-1', actorId: 'engineer-1', goal: 'demo', capability: 'maintenance-kpi', riskClass: 'operational', actionMode: 'analyse', requestedAt: '2026-09-09T10:00:00Z', ...overrides };
@@ -22,7 +23,7 @@ function task(overrides: Partial<AgentTask> = {}): AgentTask {
 function runtime(options: { handlers?: readonly CapabilityHandler[]; model?: ModelGateway | null; baseUrl?: string | null; tools?: ToolRegistry } = {}) {
   const auditLog = new InMemoryAuditLog();
   const memoryStore = new InMemoryMemoryStore();
-  const tools = options.tools ?? buildStandardTools({ maximo: new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS }), contract: new InMemoryContractReadPort([DEMO_CONTRACT_KPI_SET]), memory: memoryStore });
+  const tools = options.tools ?? buildStandardTools({ maximo: new MockMaximoReadPort({ assets: DEMO_ASSETS, workOrders: DEMO_WORK_ORDERS, preventiveMaintenance: DEMO_PM_RECORDS }), contract: new InMemoryContractReadPort([DEMO_CONTRACT_KPI_SET]), condition: new InMemoryConditionReadPort(DEMO_CONDITION_PROFILES), memory: memoryStore });
   let tick = 0;
   const rt = new AgentRuntime({ catalog: AGENT_CATALOG, tools, handlers: options.handlers ?? createStandardHandlers(DEMO_SCOPE), auditLog, memoryStore, modelGateway: options.model ?? null, modelPolicy: { baseUrl: options.baseUrl ?? null, remoteApprovedForInternal: false, remoteApprovedForConfidential: false }, now: () => new Date(Date.parse('2026-09-09T10:00:00Z') + (tick++) * 1000).toISOString() });
   return { rt, auditLog, memoryStore };
@@ -137,4 +138,52 @@ test('data quality agent flags the open in-progress failure and missing timestam
   const value = record.output?.value as { findings: { code: string; workOrderId: string | null }[]; provisional: boolean };
   assert.ok(value.findings.some((f) => f.code === 'open_beyond_period' && f.workOrderId === 'WO-1004'));
   assert.equal(value.provisional, false);
+});
+
+test('asset health run assembles inputs from condition and Maximo ports and scores with the migrated engine', async () => {
+  const { rt } = runtime();
+  const record = await rt.run(task({ capability: 'asset-health', riskClass: 'operational' }));
+  assert.equal(record.status, 'completed');
+  assert.equal(record.agentId, 'asset-intelligence');
+  const value = record.output?.value as { summary: { total: number; highRisk: number; awaitingReview: number }; assets: { id: string; riskBand: string; healthBand: string; openWorkOrders: number }[]; engineVersion: string };
+  assert.equal(value.engineVersion, 'railmind-legacy-v1');
+  assert.equal(value.summary.total, 3);
+  assert.equal(value.assets[0]?.id, 'ATC-ZC-02');
+  assert.equal(value.assets[0]?.healthBand, 'critical');
+  assert.equal(value.assets[0]?.riskBand, 'high');
+  assert.equal(value.assets.find((a) => a.id === 'TRAM-APS-03')?.openWorkOrders, 2);
+  assert.ok(record.toolCalls.every((c) => ['condition.read', 'maximo.read'].includes(c.toolId)));
+  assert.ok(record.output!.evidence.some((e) => e.sourceSystem === 'condition_monitoring'));
+  assert.ok(record.output!.evidence.some((e) => e.entityType === 'pm'));
+});
+
+test('failure risk exposes ranked drivers and flags high-risk recommendations for engineer review', async () => {
+  const { rt } = runtime();
+  const record = await rt.run(task({ capability: 'failure-risk', riskClass: 'operational' }));
+  const value = record.output?.value as { assessments: { assetId: string; riskBand: string; drivers: { name: string; contribution: number }[]; recommendation: { requiresEngineerReview: boolean; action: string } }[] };
+  const worst = value.assessments[0]!;
+  assert.equal(worst.assetId, 'ATC-ZC-02');
+  assert.ok(worst.drivers.length >= 3);
+  assert.ok(Math.abs(worst.drivers.reduce((s, d) => s + d.contribution, 0) - 1) < 1e-5);
+  assert.equal(worst.recommendation.requiresEngineerReview, true);
+});
+
+test('maintenance priority proposals are gated: analyse mode never proposes; propose_write needs approval and a named review for high risk', async () => {
+  const { rt } = runtime();
+  const analyse = await rt.run(task({ capability: 'maintenance-priority', riskClass: 'operational' }));
+  assert.equal((analyse.output?.value as { proposals: unknown[] }).proposals.length, 0);
+  assert.equal(analyse.releaseReady, true);
+
+  const unreviewed = await rt.run(task({ taskId: 'T-9', capability: 'maintenance-priority', actionMode: 'propose_write' }));
+  assert.equal(unreviewed.approvalRequired, true);
+  assert.equal(unreviewed.releaseReady, false);
+  const blocked = (unreviewed.output?.value as { proposals: { assetId: string; blocked?: string }[] }).proposals;
+  assert.equal(blocked.find((p) => p.assetId === 'ATC-ZC-02')?.blocked, 'engineer_review_required');
+
+  const reviewed = await rt.run(task({ taskId: 'T-10', capability: 'maintenance-priority', actionMode: 'propose_write', context: { review: { reviewerId: 'a.zaian', reviewerRole: 'Chief Engineer', decision: 'approved', at: '2026-09-09T09:00:00Z' } } }));
+  const proposals = (reviewed.output?.value as { proposals: { assetId: string; priority?: number; submittedToMaximo?: boolean; blocked?: string }[] }).proposals;
+  const worst = proposals.find((p) => p.assetId === 'ATC-ZC-02');
+  assert.equal(worst?.priority, 1);
+  assert.equal(worst?.submittedToMaximo, false);
+  assert.equal(reviewed.releaseReady, false, 'a proposal is never release-ready without the runtime approval gate');
 });

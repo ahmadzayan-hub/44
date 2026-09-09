@@ -20,13 +20,14 @@ export type AuditAction =
   | 'tool.called'
   | 'model.invoked'
   | 'model.blocked'
+  | 'auth.denied'
   | 'proposal.created';
 
 export interface AuditEventInput {
   action: AuditAction;
   actorId: string;
   actorRole?: string;
-  subjectType: 'report' | 'task' | 'proposal' | 'run';
+  subjectType: 'report' | 'task' | 'proposal' | 'run' | 'principal';
   subjectId: string;
   at: string;
   fromState?: string;

@@ -43,7 +43,10 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - Agent OS runtime (orchestrator): deterministic routing, risk escalation to the capability minimum, plan-scoped read-only tools, model access by data-classification policy, evidence verification, approval gate, hash-chained audit and structured decision memory (ADR-003)
 - executable capability handlers: data quality, maintenance KPI, exception analysis, monthly/quarterly/annual reporting (deterministic narrative, model narrative when policy allows) and executive briefing that consumes governed decision memory
 - contract context port serving approved KPI definition sets (demo set in P0)
-- local decision API: governed agent runs, report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate and agent workspace are interactive
+- bearer-token authentication with hashed tokens and role-based permissions (viewer, engineer, manager, contract-owner, admin); the audit actor is always the authenticated principal; demo identities only when no users are configured
+- asset intelligence migrated from the legacy RailMind product: health index, failure-risk score with named drivers, recommendation, engineer-review gate and Maximo work-order proposals that RailMind never submits itself
+- condition-monitoring port (in-memory demo profiles) feeding the asset-intelligence agent alongside Maximo
+- local decision API: governed agent runs, report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate, asset intelligence and agent workspace are interactive
 - PostgreSQL adapters for the audit log, memory store and report state behind the same interfaces, with a database-level append-only guard on audit rows
 - local verification, packaged build smoke test, static preview smoke test and an active GitHub Actions workflow (`.github/workflows/ci.yml`)
 
@@ -87,7 +90,19 @@ The browser layer owns bilingual labels and layout only. If a number on screen i
 | GET | `/api/audit` | all audit events with hash-chain verification |
 | GET | `/api/agents` | the registered agent catalog |
 
-P0 has no authentication. The named actor is supplied by the caller and recorded as given. Authentication and role-based access control are release gates before any live data. The OpenAPI description is in `docs/openapi.yaml`.
+### Authentication and roles
+
+Every route except `/api/health` and `/api/auth/demo-identities` requires `Authorization: Bearer <token>`. Tokens are resolved by a directory that stores SHA-256 hashes only. The audit trail records the authenticated principal id and role; actor fields in request bodies are ignored.
+
+| Role | Adds |
+|---|---|
+| viewer | read report, audit, runs, agents |
+| engineer | plan and run agents, submit a report for review |
+| manager | approve or reject a report |
+| contract-owner | lock a report period |
+| admin | reset the demo package |
+
+Without `RAILMIND_USERS` the server runs in **demo mode** with public demo tokens (`demo-viewer`, `demo-engineer`, `demo-manager`, `demo-owner`, `demo-admin`) for the synthetic preview. Setting `RAILMIND_USERS` (JSON array of `principalId`, `displayName`, `role`, `tokenSha256`) disables demo tokens; generate a hash with `node --experimental-strip-types scripts/hash-token.mjs <token>`. Enterprise SSO (OIDC or Keycloak) can replace the directory behind the same `TokenDirectory` interface. The OpenAPI description is in `docs/openapi.yaml`.
 
 ### Configuration
 

@@ -1,4 +1,5 @@
 import type { CapabilityHandler } from '../agent-os/handlers.ts';
+import { createAssetHealthHandler, createFailureRiskHandler, createMaintenancePriorityHandler } from './asset-intelligence.ts';
 import { createDataQualityHandler } from './data-quality.ts';
 import { createExceptionAnalysisHandler, createMaintenanceKpiHandler } from './maintenance-kpi.ts';
 import { createExecutiveBriefingHandler, createReportingHandler } from './reporting.ts';
@@ -14,9 +15,13 @@ export function createStandardHandlers(defaults: AnalysisScope): readonly Capabi
     createReportingHandler('quarterly', defaults),
     createReportingHandler('annual', defaults),
     createExecutiveBriefingHandler(defaults),
+    createAssetHealthHandler(),
+    createFailureRiskHandler(),
+    createMaintenancePriorityHandler(),
   ];
 }
 
+export * from './asset-intelligence.ts';
 export * from './data-quality.ts';
 export * from './maintenance-kpi.ts';
 export * from './reporting.ts';

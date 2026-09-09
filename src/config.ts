@@ -8,6 +8,8 @@ export interface AppConfig {
   port: number;
   databaseUrl: string | null;
   classification: DataClassification;
+  /** JSON directory of principals with token hashes; null selects the demo directory. */
+  usersJson: string | null;
   llm: { baseUrl: string | null; model: string; apiKey: string | undefined; remoteApprovedForInternal: boolean; remoteApprovedForConfidential: boolean };
   maximo: { baseUrl: string | null; apiKey: string | undefined; objectStructures: { assets: string; workOrders: string; preventiveMaintenance: string; meters: string; invoices: string } };
 }
@@ -28,6 +30,7 @@ export function loadConfig(env: Env): AppConfig {
     port: Number.isFinite(port) && port > 0 ? port : 4173,
     databaseUrl: env.DATABASE_URL?.trim() || null,
     classification: classification(env.DATA_CLASSIFICATION?.trim()),
+    usersJson: env.RAILMIND_USERS?.trim() || null,
     llm: {
       baseUrl: env.LLM_BASE_URL?.trim() || null,
       model: env.LLM_MODEL?.trim() || 'Qwen3-8B',
@@ -55,6 +58,7 @@ export function describeConfig(config: AppConfig): Record<string, string | numbe
     port: config.port,
     persistence: config.databaseUrl ? 'postgres' : 'in-memory',
     classification: config.classification,
+    auth: config.usersJson ? 'token' : 'demo',
     model: config.llm.baseUrl ? `${config.llm.model} @ ${config.llm.baseUrl}` : 'none (deterministic only)',
     maximo: config.maximo.baseUrl ? 'rest (read-only)' : 'mock',
   };

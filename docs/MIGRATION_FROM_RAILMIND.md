@@ -32,3 +32,16 @@ Project 44 / RailMind Agent OS  ← canonical platform
   ├─ Reporting Intelligence module
   └─ Agent OS + governance
 ```
+
+## Migration record (2026-09-09)
+
+| Legacy module | Project 44 location | Notes |
+|---|---|---|
+| `src/domain/types.ts` | `src/asset-intelligence/types.ts` | `Asset` became `AssetRiskInput` (assembled from ports, not typed in); `position` dropped (map layout only) |
+| `src/domain/risk.ts` | `src/asset-intelligence/risk.ts` | Logic, weights and thresholds ported unchanged; tagged `railmind-legacy-v1`; weights remain uncalibrated demo values |
+| `src/domain/maximo.ts` | `src/asset-intelligence/proposal.ts` | `EngineerReview` mapped onto `HumanApproval`; proposals run in `propose_write` mode and stay behind the P0 approval gate |
+| `src/data/sample-network.ts` | `src/asset-intelligence/sample-network.ts` | Kept as a synthetic fixture for fidelity tests |
+| `tests/risk.test.ts`, `tests/maximo.test.ts` | `tests/asset-risk.test.ts` | Same assertions on `node:test` |
+| React UI (`NetworkMap`, `AssetDetail`) | Not migrated | The Control Tower Asset Intelligence view calls the agent through the API instead |
+
+New in Project 44: `src/connectors/condition/port.ts` (condition profiles), `condition.read` tool, and three capability handlers (`asset-health`, `failure-risk`, `maintenance-priority`) that assemble inputs from Maximo and condition ports and run inside the governed runtime.

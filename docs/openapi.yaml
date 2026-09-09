@@ -5,9 +5,17 @@ info:
   description: >-
     Local decision API for the P0 synthetic demo. Mutates RailMind-owned state only
     (report status, audit trail, agent memory). Never writes to Maximo, finance or
-    contract systems. No authentication in P0: the named actor is caller-supplied.
+    contract systems. All routes except /api/health and /api/auth/demo-identities require
+    a bearer token; the audit actor is the authenticated principal.
 servers:
   - url: http://localhost:4173
+security:
+  - bearer: []
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
 paths:
   /api/health:
     get:
@@ -15,6 +23,19 @@ paths:
       responses:
         '200': { description: Healthy }
         '503': { description: Dependency probe failed }
+  /api/auth/demo-identities:
+    get:
+      security: []
+      summary: Demo identities and their public tokens (demo mode only)
+      responses:
+        '200': { description: Identities }
+        '404': { description: Not available in token mode }
+  /api/auth/me:
+    get:
+      summary: The authenticated principal and its permissions
+      responses:
+        '200': { description: Principal }
+        '401': { description: Missing or invalid token }
   /api/report:
     get:
       summary: Current report package, readiness and its audit trail

@@ -13,7 +13,9 @@ Status date: 2026-09-09
 | Grounded reporting prompt | Implemented | `src/llm/report-narrative.ts` |
 | Agent policy kernel | Implemented | `src/agent-os/kernel.ts`, `policy.ts`; risk class escalated to the capability minimum |
 | Agent OS runtime (orchestrator) | Implemented | `src/agent-os/orchestrator.ts`, `tools.ts`, `standard-tools.ts`, `handlers.ts`; see ADR-003 |
-| Capability handlers | Implemented (7) | `src/agents/*`: data-quality, maintenance-kpi, exception-analysis, monthly/quarterly/annual-report, executive-briefing. Not implemented: asset-health, failure-risk, maintenance-priority, contract-context, finance-context (fail closed) |
+| Capability handlers | Implemented (10) | `src/agents/*`: data-quality, maintenance-kpi, exception-analysis, monthly/quarterly/annual-report, executive-briefing, asset-health, failure-risk, maintenance-priority. Not implemented: contract-context, finance-context (fail closed) |
+| Asset intelligence (migrated) | Implemented | `src/asset-intelligence/*` ported from `ahmadzayan-hub/RailMind` with its fidelity tests; condition port in `src/connectors/condition/port.ts` |
+| Authentication and RBAC | Implemented (token directory) | `src/auth/*`: hashed bearer tokens, five roles, permission checks on every mutating route, denials audited; demo identities only without `RAILMIND_USERS` |
 | Model invocation policy | Implemented | `src/llm/policy.ts`: local vs remote endpoint, data classification, explicit remote approvals |
 | Contract context port | Implemented (in-memory) | `src/connectors/contract/port.ts` serving the demo definition set |
 | Composition root and configuration | Implemented | `src/app/compose.ts`, `src/config.ts`, `.env.example` |
@@ -32,8 +34,7 @@ Status date: 2026-09-09
 | Production Maximo credentials / object mappings | Pending owner environment | No credentials are stored in GitHub |
 | Approved RTA contractual KPI formulas | Pending formal source | Demo thresholds must not be used operationally |
 | Finance production mapping | Port exists; source mapping pending | Requires approved Maximo finance fields/object structure |
-| Production auth/RBAC | P1 | Do not expose production data before this gate |
-| Identity on API calls | P1 | Actor id and role are caller-supplied; bind them to an authenticated principal before live data |
+| Enterprise identity (SSO) | P1 | Token directory is the interface; bind to OIDC or Keycloak before live data |
 
 ## Release gate
 

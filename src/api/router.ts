@@ -3,6 +3,8 @@ import type { ActionMode, AgentTask, DataClassification, HumanApproval, RiskClas
 import { createExecutionPlan } from '../agent-os/kernel.ts';
 import type { MemoryStore } from '../agent-os/memory.ts';
 import type { AgentRuntime } from '../agent-os/orchestrator.ts';
+import { TRANSITION_PERMISSION, hasPermission, permissionsOf, type Permission, type Principal } from '../auth/principal.ts';
+import type { TokenDirectory } from '../auth/token-directory.ts';
 import type { AuditLog } from '../audit/log.ts';
 import { reportReadiness, transitionReport, type ReportTransition } from '../reporting/approval.ts';
 import type { ReportPackage } from '../reporting/contracts.ts';
@@ -11,9 +13,11 @@ import type { ReportStore } from '../reporting/store.ts';
 /**
  * Local decision API. It mutates RailMind-owned state only (report status,
  * audit trail, memory). It never writes to Maximo, finance or contract
- * systems. P0 has no authentication: the named actor is supplied by the
- * caller and recorded as given. Authentication and RBAC are release gates
- * before any live data (see docs/P0_IMPLEMENTATION_STATUS.md).
+ * systems.
+ *
+ * Every route except /api/health and /api/auth/demo-identities requires a
+ * bearer token resolved by the token directory. The audit actor is always the
+ * authenticated principal; actor fields in request bodies are ignored.
  */
 export interface ApiDependencies {
   reportStore: ReportStore;
@@ -29,12 +33,15 @@ export interface ApiDependencies {
   classification?: DataClassification;
   /** Dependency probe (e.g. SELECT 1) used by /api/health. */
   healthCheck?: () => Promise<void>;
+  /** Bearer-token directory. Required: there is no unauthenticated mode. */
+  tokenDirectory: TokenDirectory;
 }
 
 /** Structural subset of Node's IncomingMessage/ServerResponse so src/ stays runtime-neutral. */
 export interface ApiRequest extends AsyncIterable<Uint8Array | string> {
   method?: string;
   url?: string;
+  headers?: Record<string, string | string[] | undefined>;
 }
 
 export interface ApiResponse {
@@ -87,10 +94,10 @@ function str(body: Record<string, unknown>, key: string): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-function buildTransition(body: Record<string, unknown>, now: string): ReportTransition {
+function buildTransition(body: Record<string, unknown>, now: string, principal: Principal): ReportTransition {
   const type = str(body, 'type');
-  const actorId = str(body, 'actorId') ?? '';
-  const actorRole = str(body, 'actorRole');
+  const actorId = principal.principalId;
+  const actorRole = principal.role;
   const at = str(body, 'at') ?? now;
   const note = str(body, 'note');
   switch (type) {
@@ -114,13 +121,13 @@ function buildTransition(body: Record<string, unknown>, now: string): ReportTran
   }
 }
 
-function buildTask(body: Record<string, unknown>, now: string): AgentTask {
+function buildTask(body: Record<string, unknown>, now: string, principal: Principal): AgentTask {
   const capability = str(body, 'capability');
-  const actorId = str(body, 'actorId');
+  const actorId = principal.principalId;
   const goal = str(body, 'goal');
   const riskClass = str(body, 'riskClass') as RiskClass | undefined;
   const actionMode = str(body, 'actionMode') as ActionMode | undefined;
-  if (!capability || !actorId || !goal) throw new HttpError(400, 'capability, actorId and goal are required.');
+  if (!capability || !goal) throw new HttpError(400, 'capability and goal are required.');
   if (!riskClass || !RISK_CLASSES.includes(riskClass)) throw new HttpError(400, `riskClass must be one of ${RISK_CLASSES.join(', ')}.`);
   if (!actionMode || !ACTION_MODES.includes(actionMode)) throw new HttpError(400, `actionMode must be one of ${ACTION_MODES.join(', ')}.`);
   return {
@@ -134,8 +141,31 @@ function buildTask(body: Record<string, unknown>, now: string): AgentTask {
   };
 }
 
+function bearerToken(req: ApiRequest): string | null {
+  const raw = req.headers?.authorization;
+  const header = Array.isArray(raw) ? raw[0] : raw;
+  if (!header) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match?.[1]?.trim() ?? null;
+}
+
+
 export function createApiHandler(deps: ApiDependencies): ApiHandler {
   const now = deps.now ?? (() => new Date().toISOString());
+
+  async function authenticate(req: ApiRequest): Promise<Principal> {
+    const token = bearerToken(req);
+    if (!token) throw new HttpError(401, 'Authentication required: send Authorization: Bearer <token>.');
+    const principal = await deps.tokenDirectory.resolve(token);
+    if (!principal) throw new HttpError(401, 'Invalid or unknown token.');
+    return principal;
+  }
+
+  async function require(principal: Principal, permission: Permission, subjectId: string): Promise<void> {
+    if (hasPermission(principal, permission)) return;
+    await deps.auditLog.append({ action: 'auth.denied', actorId: principal.principalId, actorRole: principal.role, subjectType: 'principal', subjectId, at: now(), reason: `${principal.role} lacks ${permission}` });
+    throw new HttpError(403, `Role ${principal.role} does not hold permission ${permission}.`);
+  }
 
   async function currentReport(): Promise<ReportPackage> {
     const stored = await deps.reportStore.get(deps.seedReport.reportId);
@@ -151,39 +181,54 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
   }
 
   async function route(method: string, path: string, req: ApiRequest): Promise<{ status: number; body: unknown }> {
+    if (method === 'GET' && path === '/api/auth/demo-identities') {
+      if (deps.tokenDirectory.mode !== 'demo') throw new HttpError(404, 'Demo identities are not available in token mode.');
+      return { status: 200, body: { mode: 'demo', identities: deps.tokenDirectory.demoIdentities().map((entry) => ({ ...entry.principal, token: entry.token, permissions: permissionsOf(entry.principal) })) } };
+    }
     if (method === 'GET' && path === '/api/health') {
       let dependency: 'ok' | 'failed' | 'not-applicable' = 'not-applicable';
       if (deps.healthCheck) {
         try { await deps.healthCheck(); dependency = 'ok'; } catch { dependency = 'failed'; }
       }
-      const body = { service: 'Project 44 RailMind Agent OS', status: dependency === 'failed' ? 'degraded' : 'ok', mode: 'p0-demo', persistence: deps.persistence, dependency, classification: deps.classification ?? 'synthetic', capabilities: deps.runtime?.capabilities() ?? [] };
+      const body = { service: 'Project 44 RailMind Agent OS', status: dependency === 'failed' ? 'degraded' : 'ok', mode: 'p0-demo', persistence: deps.persistence, dependency, classification: deps.classification ?? 'synthetic', auth: deps.tokenDirectory.mode, capabilities: deps.runtime?.capabilities() ?? [] };
       return { status: dependency === 'failed' ? 503 : 200, body };
     }
+
+    const principal = await authenticate(req);
+    if (method === 'GET' && path === '/api/auth/me') {
+      return { status: 200, body: { principal, permissions: permissionsOf(principal), mode: deps.tokenDirectory.mode } };
+    }
     if (method === 'GET' && path === '/api/runs') {
+      await require(principal, 'runs.read', 'runs');
       return { status: 200, body: { runs: deps.runtime?.runs() ?? [] } };
     }
     if (method === 'POST' && path === '/api/agent/run') {
       if (!deps.runtime) throw new HttpError(503, 'No agent runtime is configured in this deployment.');
+      await require(principal, 'agent.run', 'agent');
       const body = await readJson(req);
-      const task = buildTask(body, now());
+      const task = buildTask(body, now(), principal);
       const context = body.context;
       const scoped: AgentTask = typeof context === 'object' && context !== null && !Array.isArray(context) ? { ...task, context: context as Record<string, unknown> } : task;
       const record = await deps.runtime.run(scoped, { classification: deps.classification ?? 'synthetic' });
       return { status: record.status === 'completed' ? 200 : record.status === 'blocked' ? 403 : 422, body: record };
     }
     if (method === 'GET' && path === '/api/report') {
+      await require(principal, 'report.read', 'report');
       return { status: 200, body: await reportView() };
     }
     if (method === 'GET' && path === '/api/audit') {
+      await require(principal, 'audit.read', 'audit');
       const events = await deps.auditLog.all();
       return { status: 200, body: { events, chain: await deps.auditLog.verifyChain(), persistence: deps.persistence } };
     }
     if (method === 'GET' && path === '/api/agents') {
+      await require(principal, 'agents.read', 'agents');
       return { status: 200, body: { agents: AGENT_CATALOG } };
     }
     if (method === 'POST' && path === '/api/report/transition') {
       const body = await readJson(req);
-      const transition = buildTransition(body, now());
+      const transition = buildTransition(body, now(), principal);
+      await require(principal, TRANSITION_PERMISSION[transition.type], deps.seedReport.reportId);
       const report = await currentReport();
       const result = transitionReport(report, transition);
       const audit = await deps.auditLog.append(result.audit);
@@ -194,15 +239,15 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
       };
     }
     if (method === 'POST' && path === '/api/report/reset') {
-      const body = await readJson(req);
-      const actorId = str(body, 'actorId');
-      if (!actorId) throw new HttpError(400, 'actorId is required.');
+      await readJson(req);
+      await require(principal, 'report.reset', deps.seedReport.reportId);
+      const actorId = principal.principalId;
       const previous = await currentReport();
       await deps.reportStore.save(deps.seedReport);
       const audit = await deps.auditLog.append({
         action: 'report.reset',
         actorId,
-        actorRole: str(body, 'actorRole'),
+        actorRole: principal.role,
         subjectType: 'report',
         subjectId: deps.seedReport.reportId,
         at: now(),
@@ -213,8 +258,9 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
       return { status: 200, body: { ok: true, audit, report: deps.seedReport, readiness: reportReadiness(deps.seedReport) } };
     }
     if (method === 'POST' && path === '/api/agent/task') {
+      await require(principal, 'agent.plan', 'agent');
       const body = await readJson(req);
-      const task = buildTask(body, now());
+      const task = buildTask(body, now(), principal);
       const planning = createExecutionPlan(task, AGENT_CATALOG);
       const audit = await deps.auditLog.append({
         action: planning.ok ? 'agent.run_planned' : 'agent.run_blocked',

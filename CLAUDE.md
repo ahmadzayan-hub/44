@@ -28,7 +28,9 @@ Current stage: **P0 synthetic demo**. Nothing here is connected to live RTA, Max
 ```
 src/
   agent-os/        contracts, policy (execution rules + release readiness), catalog (7 agents with capability minimum risk), kernel (routing + risk escalation), orchestrator (runtime), tools (registry + plan-scoped invoker), standard-tools (ports -> tool ids), handlers (capability contract), memory
-  agents/          executable capability handlers: data-quality, maintenance-kpi + exception-analysis, reporting (monthly/quarterly/annual) + executive-briefing, scope resolution
+  agents/          executable capability handlers: data-quality, maintenance-kpi + exception-analysis, reporting (monthly/quarterly/annual) + executive-briefing, asset-intelligence (asset-health, failure-risk, maintenance-priority), scope resolution
+  asset-intelligence/ migrated legacy RailMind engine: risk (health band, score, drivers, confidence, recommendation), proposal (engineer-review gate), sample network, types
+  auth/            principals, roles and permissions; hashed bearer-token directory (demo identities only without RAILMIND_USERS)
   app/compose.ts   composition root: builds ports, adapters, runtime and API dependencies from config
   config.ts        typed environment configuration (.env.example documents every variable)
   api/router.ts    local decision API (report transitions, reset, audited agent planning, audit trail); runtime-neutral, hosted by server.mjs
@@ -36,6 +38,7 @@ src/
   persistence/     SQL ports, PostgreSQL adapters (audit, memory, report store), lazy `pg` loader
   connectors/maximo/ port (anti-corruption interfaces), client (read-only REST adapter), mock (in-memory port)
   connectors/contract/ contract context port (approved KPI definition sets); in-memory adapter serving the demo set
+  connectors/condition/ condition-monitoring port (health index, trend, signals); in-memory demo profiles
   data/canonical.ts  canonical decision projections (asset, work order, invoice, contract, snapshot)
   kpi/             engine (availability, failure count, MTBF, MTTR, backlog) + demo definitions
   exceptions/      exception severity from KPI observations (breach + prior breaches -> critical)
@@ -94,8 +97,9 @@ Run `npm run verify` before every commit. All tests must pass. If you change `sr
 
 ## Known gaps (as of 2026-09-09, after the runtime work)
 
-- No authentication or RBAC. `DATA_CLASSIFICATION` is a deployment setting, not per-record classification.
-- Five catalog capabilities have no handler yet: asset-health, failure-risk, maintenance-priority, contract-context, finance-context.
+- Authentication is a hashed-token directory, not enterprise SSO. `DATA_CLASSIFICATION` is a deployment setting, not per-record classification.
+- Two catalog capabilities have no handler yet: contract-context, finance-context.
+- Asset-intelligence weights and thresholds are the legacy demo values, uncalibrated; the condition port serves synthetic profiles.
 - Run records live in process memory (`/api/runs`); only their audit events and decision memory are persisted.
 - The runtime is single-step: one handler per run, no model planning, no retries, no scheduling.
 - Only one report package (the demo seed) is served. Multi-report and multi-contract scoping is not built.
@@ -113,6 +117,8 @@ Run `npm run verify` before every commit. All tests must pass. If you change `sr
 - Telemetry no longer perturbs KPI values with synthetic noise. It replays the period event by event with the engine recomputing each KPI.
 - Approval gate is interactive through the local API with a named actor; every transition, refusal, reset and agent plan is audited and the chain is verified on read.
 - PostgreSQL adapters exist for audit, memory and report state, verified live against PostgreSQL 16 including the append-only trigger.
+- API requires bearer tokens; the audit actor is the authenticated principal; role checks on every mutating route with denials audited.
+- Legacy RailMind asset health and failure risk migrated with their fidelity tests and exposed as three governed capabilities.
 
 ## Intended direction (see docs/P0_PILOT_PLAN.md)
 
