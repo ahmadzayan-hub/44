@@ -1,5 +1,5 @@
 import type { EvidenceRef } from '../../agent-os/contracts.ts';
-import type { ExecutableKpiDefinition } from '../../kpi/engine.ts';
+import type { GovernedKpiDefinition } from '../../kpi/registry.ts';
 
 /**
  * Contract context port. Approved contract documents remain authoritative;
@@ -12,7 +12,7 @@ export interface ContractKpiSet {
   definitionVersion: string;
   /** Governance status of the definition set. Production readiness requires 'approved'. */
   approvalStatus?: 'approved' | 'draft' | 'unapproved' | 'demo_only';
-  definitions: readonly ExecutableKpiDefinition[];
+  definitions: readonly GovernedKpiDefinition[];
   /** Planned service minutes per reporting period, as defined by the contract. */
   plannedServiceMinutesPerPeriod: (periodStart: string, periodEnd: string) => number;
   /** In-scope asset ids for KPI calculation. */

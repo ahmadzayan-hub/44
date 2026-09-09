@@ -49,23 +49,23 @@ test('API drives the full approval lifecycle and records a valid audit chain', a
     assert.equal(submitted.status, 200);
     assert.equal(submitted.json.report.status, 'under_review');
     assert.equal(submitted.json.audit.actorId, 'demo.engineer');
-    assert.equal(submitted.json.audit.actorRole, 'engineer');
+    assert.equal(submitted.json.audit.actorRole, 'maintenance_engineer');
 
     const engineerApproval = await api.call('POST', '/api/report/transition', { type: 'approve', note: 'x' }, 'demo-engineer');
     assert.equal(engineerApproval.status, 403);
 
-    const refused = await api.call('POST', '/api/report/transition', { type: 'approve' }, 'demo-manager');
+    const refused = await api.call('POST', '/api/report/transition', { type: 'approve' }, 'demo-approver');
     assert.equal(refused.status, 409);
     assert.equal(refused.json.ok, false);
     assert.match(refused.json.blockers.join(' '), /critical exception/);
 
-    const approved = await api.call('POST', '/api/report/transition', { type: 'approve', actorId: 'spoofed', note: 'Mitigation reviewed.' }, 'demo-manager');
+    const approved = await api.call('POST', '/api/report/transition', { type: 'approve', actorId: 'spoofed', note: 'Mitigation reviewed.' }, 'demo-approver');
     assert.equal(approved.json.report.status, 'approved');
-    assert.equal(approved.json.report.approval.reviewerId, 'demo.manager');
+    assert.equal(approved.json.report.approval.reviewerId, 'demo.approver');
 
-    const managerLock = await api.call('POST', '/api/report/transition', { type: 'lock' }, 'demo-manager');
-    assert.equal(managerLock.status, 403);
-    const locked = await api.call('POST', '/api/report/transition', { type: 'lock' }, 'demo-owner');
+    const engineerLock = await api.call('POST', '/api/report/transition', { type: 'lock' }, 'demo-engineer');
+    assert.equal(engineerLock.status, 403);
+    const locked = await api.call('POST', '/api/report/transition', { type: 'lock' }, 'demo-approver');
     assert.equal(locked.json.report.status, 'locked');
     assert.equal(locked.json.report.lockedAt, '2026-09-09T12:00:00Z');
 
@@ -90,6 +90,13 @@ test('API refuses unauthenticated, under-privileged and malformed requests witho
     assert.equal(viewer.status, 403);
     const denied = (await api.auditLog.all()).find((e) => e.action === 'auth.denied');
     assert.equal(denied?.actorId, 'demo.viewer');
+    const crossScope = await api.call('POST', '/api/report/transition', { type: 'submit_for_review' }, 'demo-other-contract');
+    assert.equal(crossScope.status, 403, 'an engineer scoped to another contract cannot touch this report');
+    assert.match(crossScope.json.error, /not scoped/);
+    const crossRead = await api.call('GET', '/api/report', undefined, 'demo-other-contract');
+    assert.equal(crossRead.status, 403);
+    const crossRun = await api.call('POST', '/api/agent/run', { capability: 'maintenance-kpi', goal: 'x', riskClass: 'operational', actionMode: 'analyse', context: { contractId: 'DEMO-CONTRACT' } }, 'demo-other-contract');
+    assert.equal(crossRun.status, 403);
     const unknown = await api.call('POST', '/api/report/transition', { type: 'publish', actorId: 'x' });
     assert.equal(unknown.status, 400);
     const report = await api.call('GET', '/api/report');
@@ -131,7 +138,7 @@ test('API reset restores the seed and is itself audited', async () => {
     assert.equal(reset.json.audit.action, 'report.reset');
     assert.equal(reset.json.audit.fromState, 'under_review');
     assert.equal(reset.json.audit.actorId, 'demo.admin');
-    const denied = await api.call('POST', '/api/report/reset', {}, 'demo-owner');
+    const denied = await api.call('POST', '/api/report/reset', {}, 'demo-approver');
     assert.equal(denied.status, 403);
   } finally { await api.close(); }
 });
@@ -151,7 +158,8 @@ test('API executes a governed agent run through the composition root and audits 
     assert.equal(health.auth, 'demo');
     const me = await (await fetch(`${base}/api/auth/me`, { headers: auth })).json() as { principal: { principalId: string }; permissions: string[] };
     assert.equal(me.principal.principalId, 'demo.engineer');
-    assert.ok(me.permissions.includes('agent.run'));
+    assert.ok(me.permissions.includes('agent.run:maintenance'));
+    assert.deepEqual(me.principal.scopes[0], { type: 'contract', id: 'DEMO-CONTRACT' });
     const run = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: auth, body: JSON.stringify({ capability: 'maintenance-kpi', goal: 'KPIs', riskClass: 'operational', actionMode: 'analyse' }) });
     assert.equal(run.status, 200);
     const record = await run.json() as { status: string; releaseReady: boolean; toolCalls: unknown[]; auditSequences: number[]; task: { actorId: string } };
@@ -161,6 +169,10 @@ test('API executes a governed agent run through the composition root and audits 
     assert.equal(record.toolCalls.length, 4);
     const viewerRun = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: { ...auth, Authorization: 'Bearer demo-viewer' }, body: JSON.stringify({ capability: 'maintenance-kpi', goal: 'KPIs', riskClass: 'operational', actionMode: 'analyse' }) });
     assert.equal(viewerRun.status, 403);
+    const financeRunsAsset = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: { ...auth, Authorization: 'Bearer demo-finance' }, body: JSON.stringify({ capability: 'asset-health', goal: 'x', riskClass: 'operational', actionMode: 'analyse' }) });
+    assert.equal(financeRunsAsset.status, 403, 'finance reviewer cannot run asset capabilities');
+    const reliabilityRunsReport = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: { ...auth, Authorization: 'Bearer demo-reliability' }, body: JSON.stringify({ capability: 'monthly-report', goal: 'x', riskClass: 'contractual', actionMode: 'draft' }) });
+    assert.equal(reliabilityRunsReport.status, 403, 'reliability engineer cannot draft contractual reports');
     const blocked = await fetch(`${base}/api/agent/run`, { method: 'POST', headers: auth, body: JSON.stringify({ capability: 'asset-health', goal: 'x', riskClass: 'operational', actionMode: 'control' }) });
     assert.equal(blocked.status, 403);
     const runs = await (await fetch(`${base}/api/runs`, { headers: auth })).json() as { runs: unknown[] };

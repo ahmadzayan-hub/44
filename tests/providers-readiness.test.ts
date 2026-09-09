@@ -20,7 +20,7 @@ const wo = (over: Partial<MaximoWorkOrderRecord>): ProvidedRecord<MaximoWorkOrde
   value: { workOrderId: 'WO-X', assetId: 'A', workType: 'CM', status: 'COMP', reportedAt: '2026-08-05T00:00:00Z', downtimeMinutes: 60, ...over },
   provenance: { sourceSystem: 'maximo', sourceEntityType: 'work-order', sourceRecordId: over.workOrderId ?? 'WO-X', observedAt: over.reportedAt ?? '2026-08-05T00:00:00Z', ingestedAt: '2026-09-01T00:00:00Z', qualityState: 'verified' },
 });
-const approvedSet = (): ProvidedRecord<typeof DEMO_CONTRACT_KPI_SET> => ({ value: { ...DEMO_CONTRACT_KPI_SET, approvalStatus: 'approved' }, provenance: { sourceSystem: 'contract_repository', sourceEntityType: 'kpi-definition-set', sourceRecordId: 'C/v1', observedAt: '2026-08-01T00:00:00Z', ingestedAt: '2026-09-01T00:00:00Z', qualityState: 'verified' } });
+const approvedSet = (): ProvidedRecord<typeof DEMO_CONTRACT_KPI_SET> => ({ value: { ...DEMO_CONTRACT_KPI_SET, approvalStatus: 'approved', definitionVersion: 'c-v1', definitions: DEMO_CONTRACT_KPI_SET.definitions.map((d) => ({ ...d, formulaVersion: 'c-v1', approvalStatus: 'approved' as const, approvedAt: '2025-12-01T00:00:00Z', approvedBy: 'steering' })) }, provenance: { sourceSystem: 'contract_repository', sourceEntityType: 'kpi-definition-set', sourceRecordId: 'C/v1', observedAt: '2026-08-01T00:00:00Z', ingestedAt: '2026-09-01T00:00:00Z', qualityState: 'verified' } });
 const base = { periodStart: '2026-08-01T00:00:00Z', periodEnd: '2026-08-31T23:59:59Z', asOf: '2026-09-01T00:00:00Z', mode: 'production' as const };
 
 test('synthetic providers carry provenance on every record and are labelled synthetic', async () => {

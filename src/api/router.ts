@@ -4,7 +4,7 @@ import { createExecutionPlan } from '../agent-os/kernel.ts';
 import type { MemoryStore } from '../agent-os/memory.ts';
 import type { AgentRuntime } from '../agent-os/orchestrator.ts';
 import type { ControlTowerService, TowerScope } from '../app/control-tower-service.ts';
-import { TRANSITION_PERMISSION, hasPermission, permissionsOf, type Permission, type Principal } from '../auth/principal.ts';
+import { TRANSITION_PERMISSION, hasPermission, inScope, permissionsOf, runPermissionFor, type Permission, type Principal, type Scope } from '../auth/principal.ts';
 import type { TokenDirectory } from '../auth/token-directory.ts';
 import { securityHeaders } from '../http/security-headers.ts';
 import type { AuditLog } from '../audit/log.ts';
@@ -167,11 +167,18 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
     return principal;
   }
 
-  async function require(principal: Principal, permission: Permission, subjectId: string): Promise<void> {
-    if (hasPermission(principal, permission)) return;
-    await deps.auditLog.append({ action: 'auth.denied', actorId: principal.principalId, actorRole: principal.role, subjectType: 'principal', subjectId, at: now(), reason: `${principal.role} lacks ${permission}` });
-    throw new HttpError(403, `Role ${principal.role} does not hold permission ${permission}.`);
+  async function require(principal: Principal, permission: Permission, subjectId: string, scope?: Scope): Promise<void> {
+    if (!hasPermission(principal, permission)) {
+      await deps.auditLog.append({ action: 'auth.denied', actorId: principal.principalId, actorRole: principal.role, subjectType: 'principal', subjectId, at: now(), reason: `${principal.role} lacks ${permission}` });
+      throw new HttpError(403, `Role ${principal.role} does not hold permission ${permission}.`);
+    }
+    if (scope && !inScope(principal, scope)) {
+      await deps.auditLog.append({ action: 'auth.denied', actorId: principal.principalId, actorRole: principal.role, subjectType: 'principal', subjectId, at: now(), reason: `outside scope ${scope.type}:${scope.id ?? '*'}` });
+      throw new HttpError(403, `Principal is not scoped to ${scope.type} ${scope.id ?? ''}.`);
+    }
   }
+
+  const contractScope = (): Scope => ({ type: 'contract', id: deps.scope?.contractId ?? deps.seedReport.contractId });
 
   async function currentReport(): Promise<ReportPackage> {
     const stored = await deps.reportStore.get(deps.seedReport.reportId);
@@ -210,21 +217,22 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
       return { status: 200, body: { runs: deps.runtime?.runs() ?? [] } };
     }
     if (method === 'POST' && path === '/api/agent/run') {
-      if (!deps.runtime) throw new HttpError(503, 'No agent runtime is configured in this deployment.');
-      await require(principal, 'agent.run', 'agent');
       const body = await readJson(req);
       const task = buildTask(body, now(), principal);
       const context = body.context;
       const scoped: AgentTask = typeof context === 'object' && context !== null && !Array.isArray(context) ? { ...task, context: context as Record<string, unknown> } : task;
+      const targetContract = typeof scoped.context?.contractId === 'string' ? scoped.context.contractId : contractScope().id;
+      await require(principal, runPermissionFor(task.capability), 'agent', { type: 'contract', id: targetContract });
+      if (!deps.runtime) throw new HttpError(503, 'No agent runtime is configured in this deployment.');
       const record = await deps.runtime.run(scoped, { classification: deps.classification ?? 'synthetic' });
       return { status: record.status === 'completed' ? 200 : record.status === 'blocked' ? 403 : 422, body: record };
     }
     if (method === 'GET' && path === '/api/report') {
-      await require(principal, 'report.read', 'report');
+      await require(principal, 'report.read', 'report', contractScope());
       return { status: 200, body: await reportView() };
     }
     if (method === 'GET' && path === '/api/control-tower') {
-      await require(principal, 'report.read', 'control-tower');
+      await require(principal, 'report.read', 'control-tower', contractScope());
       if (!deps.controlTower || !deps.scope) throw new HttpError(503, 'Control Tower service is not configured.');
       const asOf = query.get('asOf') ?? undefined;
       if (asOf !== undefined && Number.isNaN(Date.parse(asOf))) throw new HttpError(400, 'asOf must be an ISO timestamp.');
@@ -242,7 +250,7 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
     if (method === 'POST' && path === '/api/report/transition') {
       const body = await readJson(req);
       const transition = buildTransition(body, now(), principal);
-      await require(principal, TRANSITION_PERMISSION[transition.type], deps.seedReport.reportId);
+      await require(principal, TRANSITION_PERMISSION[transition.type], deps.seedReport.reportId, contractScope());
       const report = await currentReport();
       const result = transitionReport(report, transition);
       const audit = await deps.auditLog.append(result.audit);
@@ -254,7 +262,7 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
     }
     if (method === 'POST' && path === '/api/report/reset') {
       await readJson(req);
-      await require(principal, 'report.reset', deps.seedReport.reportId);
+      await require(principal, 'report.reset', deps.seedReport.reportId, contractScope());
       const actorId = principal.principalId;
       const previous = await currentReport();
       await deps.reportStore.save(deps.seedReport);
@@ -272,7 +280,7 @@ export function createApiHandler(deps: ApiDependencies): ApiHandler {
       return { status: 200, body: { ok: true, audit, report: deps.seedReport, readiness: reportReadiness(deps.seedReport) } };
     }
     if (method === 'POST' && path === '/api/agent/task') {
-      await require(principal, 'agent.plan', 'agent');
+      await require(principal, 'agent.plan', 'agent', contractScope());
       const body = await readJson(req);
       const task = buildTask(body, now(), principal);
       const planning = createExecutionPlan(task, AGENT_CATALOG);

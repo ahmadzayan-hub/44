@@ -24,6 +24,7 @@ export type ReadinessCode =
   | 'open_beyond_period'
   | 'rejected_source_record'
   | 'stale_source'
+  | 'definition_not_effective'
   | 'unmapped_source_field';
 
 export interface ReadinessIssue {
@@ -77,6 +78,15 @@ export function assessReadiness(input: ReadinessInput): ReadinessAssessment {
     const approval = input.kpiSet.value.approvalStatus ?? (input.mode === 'synthetic' ? 'demo_only' : 'unapproved');
     if (approval === 'demo_only') issues.push({ code: 'demo_kpi_definition', severity: input.mode === 'production' ? 'block' : 'warn', detail: `KPI definition set ${input.kpiSet.value.definitionVersion} is DEMO ONLY and not contractually approved.`, kpiIds: [] });
     else if (approval !== 'approved') issues.push({ code: 'unapproved_kpi_definition', severity: 'block', detail: `KPI definition set ${input.kpiSet.value.definitionVersion} is ${approval}.`, kpiIds: [] });
+  }
+
+  for (const definition of input.kpiSet?.value.definitions ?? []) {
+    if (definition.effectiveFrom > input.periodStart || (definition.effectiveTo !== undefined && definition.effectiveTo < input.periodEnd)) {
+      issues.push({ code: 'definition_not_effective', severity: 'block', detail: `KPI ${definition.id}@${definition.formulaVersion} is not effective for the whole period.`, kpiIds: [definition.id] });
+    }
+    if (input.mode === 'production' && definition.approvalStatus !== 'approved') {
+      issues.push({ code: 'unapproved_kpi_definition', severity: 'block', detail: `KPI ${definition.id}@${definition.formulaVersion} is ${definition.approvalStatus}; production requires approved definitions.`, kpiIds: [definition.id] });
+    }
   }
 
   const records = input.workOrders;

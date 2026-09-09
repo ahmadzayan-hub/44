@@ -1,5 +1,5 @@
 import { sha256Hex } from '../audit/log.ts';
-import { isRole, type Principal, type Role } from './principal.ts';
+import { isRole, isScopeType, type Principal, type Role, type Scope } from './principal.ts';
 
 /**
  * Bearer-token directory.
@@ -26,6 +26,8 @@ export interface DirectoryEntry {
   principalId: string;
   displayName: string;
   role: Role;
+  /** Scopes the principal may act within. No scopes means no scoped resource is reachable. */
+  scopes: readonly Scope[];
   tokenSha256: string;
 }
 
@@ -46,6 +48,10 @@ export class StaticTokenDirectory implements TokenDirectory {
     for (const entry of entries) {
       if (!entry.principalId.trim() || !entry.displayName.trim()) throw new Error('Directory entries require principalId and displayName.');
       if (!isRole(entry.role)) throw new Error(`Unknown role for ${entry.principalId}: ${String(entry.role)}`);
+      for (const scope of entry.scopes) {
+        if (!isScopeType(scope.type)) throw new Error(`Unknown scope type for ${entry.principalId}: ${String(scope.type)}`);
+        if (scope.type !== 'system' && !(typeof scope.id === 'string' && scope.id.trim())) throw new Error(`Scope ${scope.type} for ${entry.principalId} requires an id.`);
+      }
       if (!/^[0-9a-f]{64}$/.test(entry.tokenSha256)) throw new Error(`tokenSha256 for ${entry.principalId} must be a 64-hex SHA-256.`);
       if (ids.has(entry.principalId)) throw new Error(`Duplicate principalId: ${entry.principalId}`);
       ids.add(entry.principalId);
@@ -58,7 +64,7 @@ export class StaticTokenDirectory implements TokenDirectory {
     const hash = await sha256Hex(token);
     for (const entry of this.#entries) {
       if (constantTimeEqual(entry.tokenSha256, hash)) {
-        return { principalId: entry.principalId, displayName: entry.displayName, role: entry.role };
+        return { principalId: entry.principalId, displayName: entry.displayName, role: entry.role, scopes: entry.scopes };
       }
     }
     return null;
@@ -70,12 +76,18 @@ export class StaticTokenDirectory implements TokenDirectory {
 }
 
 /** Synthetic-preview identities. Tokens are public by design and only valid in demo mode. */
+const DEMO_CONTRACT: Scope = { type: 'contract', id: 'DEMO-CONTRACT' };
+const SYSTEM: Scope = { type: 'system' };
+
 export const DEMO_IDENTITIES: readonly { principal: Principal; token: string }[] = [
-  { principal: { principalId: 'demo.viewer', displayName: 'Demo Viewer', role: 'viewer' }, token: 'demo-viewer' },
-  { principal: { principalId: 'demo.engineer', displayName: 'Demo Reliability Engineer', role: 'engineer' }, token: 'demo-engineer' },
-  { principal: { principalId: 'demo.manager', displayName: 'Demo Maintenance Manager', role: 'manager' }, token: 'demo-manager' },
-  { principal: { principalId: 'demo.owner', displayName: 'Demo Contract Owner', role: 'contract-owner' }, token: 'demo-owner' },
-  { principal: { principalId: 'demo.admin', displayName: 'Demo Administrator', role: 'admin' }, token: 'demo-admin' },
+  { principal: { principalId: 'demo.viewer', displayName: 'Demo Viewer', role: 'viewer', scopes: [SYSTEM] }, token: 'demo-viewer' },
+  { principal: { principalId: 'demo.engineer', displayName: 'Demo Maintenance Engineer', role: 'maintenance_engineer', scopes: [DEMO_CONTRACT, { type: 'line', id: 'Red Line' }] }, token: 'demo-engineer' },
+  { principal: { principalId: 'demo.reliability', displayName: 'Demo Reliability Engineer', role: 'reliability_engineer', scopes: [DEMO_CONTRACT] }, token: 'demo-reliability' },
+  { principal: { principalId: 'demo.contract', displayName: 'Demo Contract Manager', role: 'contract_manager', scopes: [DEMO_CONTRACT] }, token: 'demo-contract' },
+  { principal: { principalId: 'demo.finance', displayName: 'Demo Finance Reviewer', role: 'finance_reviewer', scopes: [DEMO_CONTRACT] }, token: 'demo-finance' },
+  { principal: { principalId: 'demo.approver', displayName: 'Demo Approver', role: 'approver', scopes: [DEMO_CONTRACT] }, token: 'demo-approver' },
+  { principal: { principalId: 'demo.admin', displayName: 'Demo Administrator', role: 'administrator', scopes: [SYSTEM] }, token: 'demo-admin' },
+  { principal: { principalId: 'demo.other', displayName: 'Demo Engineer (other contract)', role: 'maintenance_engineer', scopes: [{ type: 'contract', id: 'OTHER-CONTRACT' }] }, token: 'demo-other-contract' },
 ];
 
 export class DemoTokenDirectory implements TokenDirectory {
@@ -98,7 +110,9 @@ export function parseDirectoryEntries(json: string): readonly DirectoryEntry[] {
   if (!Array.isArray(parsed)) throw new Error('RAILMIND_USERS must be a JSON array.');
   return parsed.map((item, index) => {
     const row = typeof item === 'object' && item !== null ? item as Record<string, unknown> : {};
-    const entry = { principalId: String(row.principalId ?? ''), displayName: String(row.displayName ?? ''), role: row.role as Role, tokenSha256: String(row.tokenSha256 ?? '') };
+    const scopesRaw = Array.isArray(row.scopes) ? row.scopes : [];
+    const scopes: Scope[] = scopesRaw.map((scope) => { const value = typeof scope === 'object' && scope !== null ? scope as Record<string, unknown> : {}; return { type: value.type as Scope['type'], id: typeof value.id === 'string' ? value.id : undefined }; });
+    const entry = { principalId: String(row.principalId ?? ''), displayName: String(row.displayName ?? ''), role: row.role as Role, scopes, tokenSha256: String(row.tokenSha256 ?? '') };
     if (!entry.principalId) throw new Error(`RAILMIND_USERS[${index}] is missing principalId.`);
     return entry;
   });
