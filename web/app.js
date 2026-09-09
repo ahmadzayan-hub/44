@@ -14,6 +14,9 @@ const pack = DEMO_PACK;
 const state = {
   language: 'ar',
   compact: false,
+  /* Live decision state from the local API. Null until /api/report responds; the static pack is the fallback. */
+  live: { available: false, report: null, readiness: null, audit: [], chain: null, persistence: null },
+  identity: { actorId: 'ahmed.zaian', actorRole: 'Decision owner' },
   telemetry: { active: true, timer: null, index: pack.timeline.length - 1, eventId: 0, lastSignalAt: null },
   gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true }, selected: null, eventLabel: null },
 };
@@ -53,10 +56,10 @@ const en = {
   pilot:'Safe pilot mode', navControl:'Control Tower', navNetwork:'Network GIS', navExceptions:'Exception Centre', navAssets:'Asset Intelligence', navContract:'Contract Performance', navReports:'Reports Workspace', navAgents:'Agent Workspace', navPortfolio:'Portfolio Intelligence', portfolioKicker:'SANITISED PORTFOLIO ANALYTICS', portfolioTitle:'Portfolio intelligence', portfolioText:'Explore aggregated budget, expenditure and award-status insight. No source-system connection or external write exists.', portfolioBoundaryTitle:'Aggregated read-only data', portfolioBoundaryCopy:'Generalised data · no organisation, vendor, or initiative identifiers', guardrailTitle:'Decision safeguards', guardrailNav:'Read, analyse, and draft only', userName:'Ahmed Zaian', userRole:'Decision owner', search:'Search or open command', compact:'Compact view', eyebrow:'CONTROL TOWER · INTELLIGENT OPERATIONS', greeting:'Good morning, Ahmed', tagline:'Evidence-led operations, not impressions', synthetic:'Safe illustrative data for testing', updated:'Last updated', executiveView:'EXECUTIVE VIEW', heroTitle:'Today’s picture is clear.', heroText:'Move from exception to a clear decision with a complete trail for source, reviewer, and approval.', refresh:'Refresh view', scopeLabel:'Current scope', scopeRed:'Pilot scope · Red Line', scopeTram:'Pilot scope · Dubai Tram', scopeDepot:'Pilot scope · Al Qusais Depot', periodLabel:'Analysis window', periodMonth:'This month', period30:'Last 30 days', periodLocked:'Locked report period', boundaryTitle:'P0 boundary', boundaryText:'Read, analyse, and draft only. No operational control or autonomous external write.', priorityDecisions:'Priority decisions', priorityText:'Rank exceptions by consequence and urgency, then open evidence before any decision is approved.', viewAll:'View all', signalSummary:'Signal summary', signalText:'The priority now: protect decision clarity before increasing automation scale.', signalSource:'Based on a traceable illustrative pack', openBrief:'Open decision brief', openBriefText:'Evidence, assumptions, and approval status', performancePulse:'Performance pulse', performanceText:'The illustrative trajectory is stable, with one evidence-linked watch point.', availability:'Availability', watchPoint:'Watch point', week1:'Week 1', week2:'Week 2', week3:'Week 3', today:'Today', evidenceChain:'Evidence chain', evidenceText:'Trace a conclusion from narrative to metric, source record, and timestamp.', sourceRecord:'Source record', governedMetric:'Governed metric', pmBacklog:'Maintenance backlog', recommendationDraft:'Recommendation draft', awaitingReview:'Awaiting human review', safeWorkspace:'SAFEGUARDED WORKSPACE', agentWorkspace:'Agent workspace', agentText:'Request analysis, then inspect assumptions and evidence before using any draft.', waiting:'Waiting for your request', suggestedQuestions:'Suggested questions', qAttention:'What decision is required today?', qEvidence:'Check evidence completeness', qBreaches:'Show KPI breaches', qReport:'Is the monthly report ready?', agentPlaceholder:'Example: Summarise PM backlog drivers in the Red Line scope', runAnalysis:'Run safeguarded analysis', agentFooter:'No high-impact decision is released before named human approval.', priorityQueue:'PRIORITY QUEUE', exceptionCentre:'Exception Centre', maximoLinked:'MAXIMO-LINKED', assetIntelligence:'Asset Intelligence', sharedTruth:'SHARED CONTRACT TRUTH', contractPerformance:'Contract Performance', approvedData:'GENERATED FROM APPROVED DATA', reportingCentre:'Reporting Centre', governedAgents:'GOVERNED MULTI-AGENT SYSTEM', askRailmind:'ASK RAILMIND', decisionQuery:'Decision query', queryInitial:'Choose a decision question. Demo answers are deterministic and grounded in synthetic data.', decisionPack:'Decision pack',
 };
 const ar = {
-  details:'التفاصيل', action:'مطلوب إجراء', source:'المصدر', observed:'وقت الرصد', quality:'حالة الجودة', verified:'تم التحقق', recommendation:'التوصية المقترحة', governance:'حاجز الحوكمة', requestReview:'إرسال للمراجعة البشرية', reviewReady:'تم تجهيز الطلب للمراجعة البشرية فقط', reviewNote:'يتطلب الاعتماد اسم المراجع والدور والتوقيت قبل اعتبار المخرج جاهزاً.', noWrite:'لا ينفذ هذا العرض أي أمر عمل أو رسالة أو تغيير في نظام مصدر.', analysisReady:'مسودة جاهزة للمراجعة', working:'يجري تجهيز المسودة...', guardrail:'واجهة P0 للقراءة والتحليل والصياغة فقط. لا توجد كتابة خارجية تلقائية.', refreshed:'تم تحديث العرض التجريبي', compactOn:'تم تفعيل العرض المبسط', compactOff:'تم إلغاء العرض المبسط', notify:'لا توجد تنبيهات غير مقروءة في العرض التجريبي.', severity:{critical:'حرج',high:'مرتفع',watch:'متابعة',good:'ضمن النطاق'}, target:'المستهدف', within:'ضمن الحد التجريبي', below:'أقل من المستهدف التجريبي', above:'أعلى من الحد التجريبي', watchTrend:'نقطة متابعة', formula:'إصدار الصيغة', evidenceCount:'سجلات مصدر', asOf:'كما في', replay:'إعادة تشغيل الفترة', engineLabel:'محسوب بمحرك KPI الحتمي', exceptionId:'معرّف الاستثناء', kpiWithin:'المؤشر ضمن المستهدف ولا يوجد استثناء مفتوح.', reportMonthly:'تقرير الأداء الشهري', reportQuarterly:'المراجعة التنفيذية الفصلية', reportAnnual:'تقرير الأصول والعقد السنوي', reportNotGenerated:'لم يتم التوليد', reportSummary:'ملخص تنفيذي حتمي', approvalGate:'بوابة الاعتماد', nextStep:'الانتقال التالي المسموح', blockers:'موانع', noBlockers:'لا توجد موانع، الحزمة جاهزة للإرسال إلى مراجعة مُسمّاة.', status:{draft:'مسودة · مراجعة بشرية مطلوبة',under_review:'قيد المراجعة',approved:'معتمد',locked:'مغلق'}, transition:{submit_for_review:'إرسال للمراجعة',approve:'اعتماد',reject:'رفض',lock:'إغلاق الفترة'}, telemetryTitle:'إعادة تشغيل حتمية لأحداث الفترة', telemetrySource:'محاكاة محلية · إعادة حساب المؤشرات عند كل سجل', telemetryPaused:'إعادة التشغيل متوقفة مؤقتاً', telemetryLast:'آخر إشارة', telemetryReady:'جاهز للبدء', telemetryPausedAt:'متوقف مؤقتاً', telemetryStop:'إيقاف التدفق', telemetryStart:'استئناف التدفق', telemetryReset:'تمت إعادة الضبط إلى إغلاق الفترة', telemetryEventPrefix:'TLM', periodClose:'إغلاق الفترة', deterministicModes:'حتمي', modelModes:'قد يستخدم نموذجاً', humanGate:'بوابة بشرية', workOrdersSeen:'أوامر عمل مرصودة',
+  details:'التفاصيل', action:'مطلوب إجراء', source:'المصدر', observed:'وقت الرصد', quality:'حالة الجودة', verified:'تم التحقق', recommendation:'التوصية المقترحة', governance:'حاجز الحوكمة', requestReview:'إرسال للمراجعة البشرية', reviewReady:'تم تجهيز الطلب للمراجعة البشرية فقط', reviewNote:'يتطلب الاعتماد اسم المراجع والدور والتوقيت قبل اعتبار المخرج جاهزاً.', noWrite:'لا ينفذ هذا العرض أي أمر عمل أو رسالة أو تغيير في نظام مصدر.', analysisReady:'مسودة جاهزة للمراجعة', working:'يجري تجهيز المسودة...', guardrail:'واجهة P0 للقراءة والتحليل والصياغة فقط. لا توجد كتابة خارجية تلقائية.', refreshed:'تم تحديث العرض التجريبي', compactOn:'تم تفعيل العرض المبسط', compactOff:'تم إلغاء العرض المبسط', notify:'لا توجد تنبيهات غير مقروءة في العرض التجريبي.', severity:{critical:'حرج',high:'مرتفع',watch:'متابعة',good:'ضمن النطاق'}, target:'المستهدف', within:'ضمن الحد التجريبي', below:'أقل من المستهدف التجريبي', above:'أعلى من الحد التجريبي', watchTrend:'نقطة متابعة', formula:'إصدار الصيغة', evidenceCount:'سجلات مصدر', asOf:'كما في', replay:'إعادة تشغيل الفترة', engineLabel:'محسوب بمحرك KPI الحتمي', exceptionId:'معرّف الاستثناء', kpiWithin:'المؤشر ضمن المستهدف ولا يوجد استثناء مفتوح.', reportMonthly:'تقرير الأداء الشهري', reportQuarterly:'المراجعة التنفيذية الفصلية', reportAnnual:'تقرير الأصول والعقد السنوي', reportNotGenerated:'لم يتم التوليد', reportSummary:'ملخص تنفيذي حتمي', approvalGate:'بوابة الاعتماد', nextStep:'الانتقال التالي المسموح', blockers:'موانع', noBlockers:'لا توجد موانع، الحزمة جاهزة للإرسال إلى مراجعة مُسمّاة.', status:{draft:'مسودة · مراجعة بشرية مطلوبة',under_review:'قيد المراجعة',approved:'معتمد',locked:'مغلق'}, transition:{submit_for_review:'إرسال للمراجعة',approve:'اعتماد',reject:'رفض',lock:'إغلاق الفترة'}, telemetryTitle:'إعادة تشغيل حتمية لأحداث الفترة', telemetrySource:'محاكاة محلية · إعادة حساب المؤشرات عند كل سجل', telemetryPaused:'إعادة التشغيل متوقفة مؤقتاً', telemetryLast:'آخر إشارة', telemetryReady:'جاهز للبدء', telemetryPausedAt:'متوقف مؤقتاً', telemetryStop:'إيقاف التدفق', telemetryStart:'استئناف التدفق', telemetryReset:'تمت إعادة الضبط إلى إغلاق الفترة', telemetryEventPrefix:'TLM', periodClose:'إغلاق الفترة', deterministicModes:'حتمي', modelModes:'قد يستخدم نموذجاً', humanGate:'بوابة بشرية', workOrdersSeen:'أوامر عمل مرصودة', identity:'الهوية المُسمّاة للإجراء', actorId:'معرّف المراجع', actorRole:'الدور', note:'ملاحظة المراجعة أو المعالجة', auditTrail:'سجل التدقيق', chainValid:'سلسلة التجزئة سليمة', chainBroken:'سلسلة التجزئة مكسورة عند', noAudit:'لا توجد أحداث تدقيق بعد.', apiOffline:'واجهة القرار غير متاحة (عرض ثابت). البوابة للقراءة فقط وتُعرض من الحزمة المولّدة.', persistence:{'in-memory':'تخزين في الذاكرة · يُعاد ضبطه عند إعادة التشغيل', postgres:'تخزين دائم PostgreSQL'}, transitionDone:'تم تنفيذ الانتقال وتسجيله في سجل التدقيق', transitionRefused:'رُفض الانتقال وسُجّل الرفض', resetDone:'تمت استعادة الحزمة التجريبية', reset:'استعادة الحزمة التجريبية', auditCols:['#','الإجراء','الفاعل','الوقت','الحالة','التجزئة'], planned:'تم تخطيط التشغيل وتسجيله', blocked:'تم منع التشغيل وتسجيل المنع', agentPlan:'خطة التنفيذ المحكومة', tools:'الأدوات المسموح بها', policy:'قرار السياسة', approvalNeeded:'يتطلب اعتماداً بشرياً مُسمى', noApproval:'ضمن حدود القراءة والتحليل', auditRef:'مرجع التدقيق', submitViaDrawer:'أُرسلت حزمة التقرير إلى المراجعة المُسمّاة',
 };
 const enExtra = {
-  details:'Details', action:'Action required', source:'Source', observed:'Observed at', quality:'Quality state', verified:'Verified', recommendation:'Proposed recommendation', governance:'Governance guardrail', requestReview:'Request human review', reviewReady:'Request prepared for human review only', reviewNote:'A reviewer name, role, and timestamp are required before an output is considered ready.', noWrite:'This demonstration never creates a work order, message, or source-system change.', analysisReady:'Draft ready for review', working:'Preparing your draft...', guardrail:'P0 interface for read, analyse, and draft only. No autonomous external write exists.', refreshed:'Illustrative view refreshed', compactOn:'Compact view enabled', compactOff:'Compact view disabled', notify:'No unread notifications in the illustrative view.', severity:{critical:'Critical',high:'High',watch:'Watch',good:'Within range'}, target:'Target', within:'Within demo target', below:'Below demo target', above:'Above demo limit', watchTrend:'Watch point', formula:'Formula version', evidenceCount:'source records', asOf:'As of', replay:'Period replay', engineLabel:'Computed by the deterministic KPI engine', exceptionId:'Exception id', kpiWithin:'KPI is within target and no exception is open.', reportMonthly:'Monthly Performance Report', reportQuarterly:'Quarterly Executive Review', reportAnnual:'Annual Asset & Contract Report', reportNotGenerated:'Not generated', reportSummary:'Deterministic executive summary', approvalGate:'Approval gate', nextStep:'Next allowed transition', blockers:'Blockers', noBlockers:'No blockers. The package is ready for submission to a named review.', status:{draft:'Draft · human review required',under_review:'Under review',approved:'Approved',locked:'Locked'}, transition:{submit_for_review:'Submit for review',approve:'Approve',reject:'Reject',lock:'Lock period'}, telemetryTitle:'Deterministic replay of period events', telemetrySource:'Local simulation · KPIs recomputed at each record', telemetryPaused:'Replay paused', telemetryLast:'Last signal', telemetryReady:'Ready to start', telemetryPausedAt:'Paused', telemetryStop:'Pause stream', telemetryStart:'Resume stream', telemetryReset:'Reset to period close', telemetryEventPrefix:'TLM', periodClose:'Period close', deterministicModes:'Deterministic', modelModes:'May use a model', humanGate:'Human gate', workOrdersSeen:'work orders observed',
+  details:'Details', action:'Action required', source:'Source', observed:'Observed at', quality:'Quality state', verified:'Verified', recommendation:'Proposed recommendation', governance:'Governance guardrail', requestReview:'Request human review', reviewReady:'Request prepared for human review only', reviewNote:'A reviewer name, role, and timestamp are required before an output is considered ready.', noWrite:'This demonstration never creates a work order, message, or source-system change.', analysisReady:'Draft ready for review', working:'Preparing your draft...', guardrail:'P0 interface for read, analyse, and draft only. No autonomous external write exists.', refreshed:'Illustrative view refreshed', compactOn:'Compact view enabled', compactOff:'Compact view disabled', notify:'No unread notifications in the illustrative view.', severity:{critical:'Critical',high:'High',watch:'Watch',good:'Within range'}, target:'Target', within:'Within demo target', below:'Below demo target', above:'Above demo limit', watchTrend:'Watch point', formula:'Formula version', evidenceCount:'source records', asOf:'As of', replay:'Period replay', engineLabel:'Computed by the deterministic KPI engine', exceptionId:'Exception id', kpiWithin:'KPI is within target and no exception is open.', reportMonthly:'Monthly Performance Report', reportQuarterly:'Quarterly Executive Review', reportAnnual:'Annual Asset & Contract Report', reportNotGenerated:'Not generated', reportSummary:'Deterministic executive summary', approvalGate:'Approval gate', nextStep:'Next allowed transition', blockers:'Blockers', noBlockers:'No blockers. The package is ready for submission to a named review.', status:{draft:'Draft · human review required',under_review:'Under review',approved:'Approved',locked:'Locked'}, transition:{submit_for_review:'Submit for review',approve:'Approve',reject:'Reject',lock:'Lock period'}, telemetryTitle:'Deterministic replay of period events', telemetrySource:'Local simulation · KPIs recomputed at each record', telemetryPaused:'Replay paused', telemetryLast:'Last signal', telemetryReady:'Ready to start', telemetryPausedAt:'Paused', telemetryStop:'Pause stream', telemetryStart:'Resume stream', telemetryReset:'Reset to period close', telemetryEventPrefix:'TLM', periodClose:'Period close', deterministicModes:'Deterministic', modelModes:'May use a model', humanGate:'Human gate', workOrdersSeen:'work orders observed', identity:'Named identity for the action', actorId:'Reviewer id', actorRole:'Role', note:'Review or mitigation note', auditTrail:'Audit trail', chainValid:'Hash chain intact', chainBroken:'Hash chain broken at', noAudit:'No audit events yet.', apiOffline:'Decision API unavailable (static preview). The gate is read-only and rendered from the generated pack.', persistence:{'in-memory':'In-memory storage · resets on restart', postgres:'Durable PostgreSQL storage'}, transitionDone:'Transition executed and recorded in the audit trail', transitionRefused:'Transition refused and the refusal recorded', resetDone:'Demo package restored', reset:'Restore demo package', auditCols:['#','Action','Actor','At','State','Hash'], planned:'Run planned and audited', blocked:'Run blocked and audited', agentPlan:'Governed execution plan', tools:'Allowed tools', policy:'Policy decision', approvalNeeded:'Named human approval required', noApproval:'Within the read/analyse boundary', auditRef:'Audit reference', submitViaDrawer:'Report package submitted for named review',
 };
 
 /* ---------- Helpers ---------- */
@@ -153,16 +156,102 @@ function reportBody() {
   return pack.summary;
 }
 
+function reportStatus() { return state.live.report?.status ?? pack.report.status; }
+function reportGate() { return state.live.readiness ?? pack.approvalGate; }
+
 function renderReports() {
-  const gate = pack.approvalGate;
-  const monthly = tx('status')[pack.report.status];
+  const monthly = tx('status')[reportStatus()];
   const r = [[tx('reportMonthly'), '31 Aug 2026', monthly, 'M'], [tx('reportQuarterly'), 'Q3 2026', tx('reportNotGenerated'), 'Q'], [tx('reportAnnual'), '2026', tx('reportNotGenerated'), 'A']];
-  $('#report-cards').innerHTML = `<div class="report-grid">${r.map(([n, d, s, i], x) => `<article class="report-card"><span class="report-icon">${i}</span><div><b>${n}</b><p>${d}</p><small>${s}</small></div>${x === 0 ? `<button data-report type="button">${tx('details')} ↗</button>` : ''}</article>`).join('')}</div><div class="report-preview" id="report-preview"></div>`;
-  $('[data-report]')?.addEventListener('click', () => {
-    const next = gate.nextTransitions.map((t) => tx('transition')[t]).join(' · ') || '—';
-    const blockers = gate.blockers.length ? `<ul>${gate.blockers.map((b) => `<li>${b}</li>`).join('')}</ul>` : `<p>${tx('noBlockers')}</p>`;
-    $('#report-preview').innerHTML = `<b>${tx('reportSummary')}</b><p>${reportBody()}</p><b>${tx('approvalGate')}: ${tx('status')[gate.status]}</b><p>${tx('nextStep')}: ${next}</p><b>${tx('blockers')}</b>${blockers}<small dir="ltr">${pack.report.reportId} · ${pack.provenance.formulaVersion}</small>`;
-  });
+  $('#report-cards').innerHTML = `<div class="report-grid">${r.map(([n, d, s, i], x) => `<article class="report-card"><span class="report-icon">${i}</span><div><b>${n}</b><p>${d}</p><small>${s}</small></div>${x === 0 ? `<button data-report type="button">${tx('details')} ↗</button>` : ''}</article>`).join('')}</div><div class="report-preview" id="report-preview"></div><section class="approval-panel" id="approval-panel"></section>`;
+  $('[data-report]')?.addEventListener('click', () => { $('#report-preview').innerHTML = `<b>${tx('reportSummary')}</b><p>${reportBody()}</p><small dir="ltr">${pack.report.reportId} · ${pack.provenance.formulaVersion}</small>`; });
+  renderApprovalPanel();
+}
+
+function statusPillFor(status) {
+  const map = { draft: 'watch', under_review: 'high', approved: 'good', locked: 'good' };
+  return `<span class="status-pill status-pill--${map[status] ?? 'watch'}"><i>●</i>${tx('status')[status]}</span>`;
+}
+
+function renderApprovalPanel() {
+  const panel = $('#approval-panel');
+  if (!panel) return;
+  const gate = reportGate();
+  const live = state.live;
+  const blockers = gate.blockers.length ? `<ul>${gate.blockers.map((b) => `<li>${b}</li>`).join('')}</ul>` : `<p>${tx('noBlockers')}</p>`;
+  const actions = gate.nextTransitions.map((t) => `<button type="button" class="approval-action approval-action--${t}" data-transition="${t}" ${live.available ? '' : 'disabled'}>${tx('transition')[t]}</button>`).join('');
+  const approval = live.report?.approval;
+  const approvalLine = approval ? `<small class="approval-record" dir="auto">✓ ${approval.decision} · ${approval.reviewerId} (${approval.reviewerRole}) · <span dir="ltr">${fmtDate(approval.at)}</span>${approval.note ? ` · ${approval.note}` : ''}</small>` : '';
+  const auditRows = live.audit.length ? `<div class="audit-table"><div class="audit-row audit-head">${tx('auditCols').map((c) => `<span>${c}</span>`).join('')}</div>${[...live.audit].reverse().map((e) => `<div class="audit-row audit-row--${e.action.endsWith('refused') || e.action.endsWith('blocked') ? 'refused' : 'ok'}"><span>${e.sequence}</span><span dir="ltr">${e.action}</span><span dir="ltr">${e.actorId}${e.actorRole ? ` · ${e.actorRole}` : ''}</span><span dir="ltr">${fmtDate(e.at)}</span><span dir="ltr">${e.fromState ?? '—'} → ${e.toState ?? '—'}</span><span dir="ltr" title="${e.hash}">${e.hash.slice(0, 12)}…</span></div>`).join('')}</div>` : `<p>${tx('noAudit')}</p>`;
+  const chain = live.chain ? (live.chain.valid ? `<span class="chain chain--ok">✓ ${tx('chainValid')}</span>` : `<span class="chain chain--bad">△ ${tx('chainBroken')} #${live.chain.brokenAtSequence}</span>`) : '';
+  panel.innerHTML = `<div class="approval-head"><div><p class="section-kicker">${tx('approvalGate')}</p><h3>${statusPillFor(reportStatus())} <span dir="ltr">${pack.report.reportId}</span></h3>${approvalLine}</div><small class="persistence-badge">${live.available ? tx('persistence')[live.persistence] ?? live.persistence : tx('apiOffline')}</small></div>
+    <div class="approval-body"><div class="approval-form"><label><span>${tx('actorId')}</span><input id="actor-id" type="text" dir="ltr" value="${state.identity.actorId}"></label><label><span>${tx('actorRole')}</span><input id="actor-role" type="text" value="${state.identity.actorRole}"></label><label class="approval-note"><span>${tx('note')}</span><input id="actor-note" type="text" placeholder="${isAr() ? 'مطلوبة عند الاعتماد مع استثناء حرج أو عند الرفض' : 'Required to approve with a critical exception, or to reject'}"></label></div>
+    <div class="approval-actions">${actions || `<span class="approval-final">${tx('status')[reportStatus()]}</span>`}<button type="button" class="approval-reset" id="approval-reset" ${live.available ? '' : 'disabled'}>↻ ${tx('reset')}</button></div>
+    <div class="approval-blockers"><b>${tx('blockers')}</b>${blockers}</div></div>
+    <div class="approval-audit"><div class="approval-audit-head"><b>${tx('auditTrail')}</b>${chain}</div>${auditRows}</div>`;
+  $$('[data-transition]').forEach((b) => b.addEventListener('click', () => runTransition(b.dataset.transition)));
+  $('#approval-reset')?.addEventListener('click', resetReport);
+  ['#actor-id', '#actor-role'].forEach((sel) => $(sel)?.addEventListener('input', () => { state.identity.actorId = $('#actor-id').value.trim(); state.identity.actorRole = $('#actor-role').value.trim(); }));
+}
+
+/* ---------- Local decision API ---------- */
+
+async function api(path, body) {
+  const response = await fetch(path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const json = await response.json();
+  return { status: response.status, json };
+}
+
+async function loadLive() {
+  try {
+    const report = await api('/api/report');
+    const audit = await api('/api/audit');
+    state.live = { available: true, report: report.json.report, readiness: report.json.readiness, audit: report.json.audit, chain: audit.json.chain, persistence: report.json.persistence };
+  } catch {
+    state.live = { ...state.live, available: false };
+  }
+  renderReports();
+}
+
+function identityPayload() {
+  return { actorId: state.identity.actorId, actorRole: state.identity.actorRole, note: $('#actor-note')?.value.trim() || undefined };
+}
+
+async function runTransition(type) {
+  if (!state.live.available) { toast(tx('apiOffline')); return; }
+  try {
+    const result = await api('/api/report/transition', { type, ...identityPayload() });
+    toast(result.json.ok ? tx('transitionDone') : `${tx('transitionRefused')}: ${(result.json.blockers ?? [result.json.error]).join(' ')}`);
+    await loadLive();
+    if (!result.json.ok && result.json.blockers?.length) { const box = $('.approval-blockers'); if (box) box.innerHTML = `<b>${tx('blockers')}</b><ul>${result.json.blockers.map((b) => `<li>${b}</li>`).join('')}</ul>`; }
+  } catch { toast(tx('apiOffline')); }
+}
+
+async function resetReport() {
+  if (!state.live.available) return;
+  try { await api('/api/report/reset', identityPayload()); toast(tx('resetDone')); await loadLive(); } catch { toast(tx('apiOffline')); }
+}
+
+const questionTasks = {
+  attention: { capability: 'executive-briefing', actionMode: 'draft', riskClass: 'operational' },
+  evidence: { capability: 'data-quality', actionMode: 'analyse', riskClass: 'routine' },
+  breaches: { capability: 'maintenance-kpi', actionMode: 'analyse', riskClass: 'operational' },
+  report: { capability: 'monthly-report', actionMode: 'draft', riskClass: 'contractual' },
+};
+
+async function auditedAgentRun(kind, goal, target) {
+  const spec = questionTasks[kind] ?? { capability: 'maintenance-kpi', actionMode: 'analyse', riskClass: 'operational' };
+  if (!state.live.available) return;
+  try {
+    const result = await api('/api/agent/task', { ...spec, actorId: state.identity.actorId, goal });
+    const box = $(target);
+    if (!box) return;
+    const j = result.json;
+    const plan = j.ok
+      ? `<div class="agent-plan"><b>${tx('agentPlan')}</b><span dir="ltr">${j.plan.agent.name} · ${spec.capability} · ${spec.actionMode}</span><span>${tx('tools')}: <span dir="ltr">${j.plan.toolIds.join(', ')}</span></span><span>${tx('policy')}: ${j.plan.policy.approvalRequired ? tx('approvalNeeded') : tx('noApproval')}</span><span>${tx('auditRef')}: <span dir="ltr">#${j.audit.sequence} · ${j.audit.hash.slice(0, 12)}…</span></span></div>`
+      : `<div class="agent-plan agent-plan--blocked"><b>${tx('blocked')}</b><span dir="ltr">${j.detail ?? j.error}</span><span>${tx('auditRef')}: <span dir="ltr">#${j.audit?.sequence ?? '—'}</span></span></div>`;
+    box.insertAdjacentHTML('beforeend', plan);
+    toast(j.ok ? tx('planned') : tx('blocked'));
+  } catch { /* static preview: deterministic answer only */ }
 }
 
 function renderAgents() {
@@ -195,10 +284,10 @@ function answerText(kind) {
   if (kind === 'breaches') {
     return isAr() ? `يوجد ${breaches.length} خرق لمؤشرات تجريبية: ${breachList}.` : `There are ${breaches.length} demo KPI breaches: ${breachList}.`;
   }
-  const gateStatus = tx('status')[pack.report.status];
+  const gateStatus = tx('status')[reportStatus()];
   return isAr()
-    ? `${pack.report.status === 'approved' || pack.report.status === 'locked' ? 'نعم' : 'لا'}. التقرير الشهري في حالة "${gateStatus}"، والانتقال التالي المسموح هو ${pack.approvalGate.nextTransitions.map((t) => tx('transition')[t]).join(' / ') || 'لا شيء'}. ${ct.criticalExceptions ? `يوجد ${ct.criticalExceptions} استثناء حرج يستلزم اعتماداً بشرياً مُسمى مع ملاحظة معالجة.` : ''}`
-    : `${pack.report.status === 'approved' || pack.report.status === 'locked' ? 'Yes' : 'No'}. The monthly report is "${gateStatus}"; the next allowed transition is ${pack.approvalGate.nextTransitions.map((t) => tx('transition')[t]).join(' / ') || 'none'}. ${ct.criticalExceptions ? `${ct.criticalExceptions} critical exception(s) require a named human approval with a mitigation note.` : ''}`;
+    ? `${reportStatus() === 'approved' || reportStatus() === 'locked' ? 'نعم' : 'لا'}. التقرير الشهري في حالة "${gateStatus}"، والانتقال التالي المسموح هو ${reportGate().nextTransitions.map((t) => tx('transition')[t]).join(' / ') || 'لا شيء'}. ${ct.criticalExceptions ? `يوجد ${ct.criticalExceptions} استثناء حرج يستلزم اعتماداً بشرياً مُسمى مع ملاحظة معالجة.` : ''}`
+    : `${reportStatus() === 'approved' || reportStatus() === 'locked' ? 'Yes' : 'No'}. The monthly report is "${gateStatus}"; the next allowed transition is ${reportGate().nextTransitions.map((t) => tx('transition')[t]).join(' / ') || 'none'}. ${ct.criticalExceptions ? `${ct.criticalExceptions} critical exception(s) require a named human approval with a mitigation note.` : ''}`;
 }
 
 const footer = () => (isAr() ? 'لا يتم نشر أي قرار عالي الأثر قبل اعتماد بشري مُسمى.' : 'No high-impact decision is released before named human approval.');
@@ -412,7 +501,11 @@ function openDecision(kpiId) {
   $('#drawer-content').innerHTML = `<div class="drawer-status">${status(sev)}</div><h3>${copy.title}</h3><small class="drawer-secondary">${copy.alt}</small><section class="drawer-block"><span>${kpiName(k.id)}</span><p><b dir="ltr">${fmtValue(k.id, k.value)}${unit(k.unit)}</b> · ${tx('target')} ${targetText(k)} · ${tx('formula')} <span dir="ltr">${k.formulaVersion}</span></p><small>${tx('engineLabel')}</small></section><section class="drawer-block"><span>${tx('recommendation')}</span><p>${copy.decision} ${isAr() ? 'هذا مقترح للمراجعة فقط.' : 'This is a review-only proposal.'}</p></section><section class="drawer-evidence"><div><span>⌁</span><p><small>${tx('source')}</small><b dir="ltr">${sourceLabel(evidence)}</b></p></div><div><span>◷</span><p><small>${tx('observed')}</small><b dir="ltr">${observed}</b></p></div><div><span>✓</span><p><small>${tx('quality')}</small><b>${tx('verified')} · ${evidence.length} ${tx('evidenceCount')}</b></p></div></section>${exception ? `<p class="review-note" dir="ltr">${tx('exceptionId')}: ${exception.id}</p>` : ''}<section class="governance-callout"><span>⌑</span><p><b>${tx('governance')}</b><small>${tx('noWrite')}</small></p></section><button class="review-button" id="request-review" type="button">✓ ${tx('requestReview')}</button><p class="review-note">◷ ${tx('reviewNote')}</p>`;
   $('#drawer-backdrop').hidden = false;
   document.body.classList.add('drawer-open');
-  $('#request-review')?.addEventListener('click', () => { toast(tx('reviewReady')); closeDrawer(); });
+  $('#request-review')?.addEventListener('click', async () => {
+    if (state.live.available && reportStatus() === 'draft') { await runTransition('submit_for_review'); toast(tx('submitViaDrawer')); }
+    else toast(tx('reviewReady'));
+    closeDrawer();
+  });
 }
 
 function closeDrawer() { $('#drawer-backdrop').hidden = true; document.body.classList.remove('drawer-open'); }
@@ -461,11 +554,12 @@ function setup() {
   $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target === $('#drawer-backdrop')) closeDrawer(); });
   $('#search-trigger').addEventListener('click', () => { switchView('agents'); setTimeout(() => $('#agent-input').focus(), 260); });
   document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); switchView('agents'); setTimeout(() => $('#agent-input').focus(), 260); } if (e.key === 'Escape') closeDrawer(); });
-  $$('[data-question]').forEach((b) => b.addEventListener('click', () => { answer(b.dataset.question); answer(b.dataset.question, '#agent-answer'); $('#agent-status').classList.add('ready'); $('#agent-status b').textContent = tx('analysisReady'); }));
+  $$('[data-question]').forEach((b) => b.addEventListener('click', () => { answer(b.dataset.question); answer(b.dataset.question, '#agent-answer'); $('#agent-status').classList.add('ready'); $('#agent-status b').textContent = tx('analysisReady'); auditedAgentRun(b.dataset.question, b.textContent.trim(), b.closest('#view-agents') ? '#query-output' : '#agent-answer'); }));
   $('#agent-run').addEventListener('click', () => {
     if (!$('#agent-input').value.trim()) { toast(isAr() ? 'اكتب سؤالاً أو اختر اقتراحاً أولاً.' : 'Write a question or choose a suggestion first.'); return; }
     const s = $('#agent-status'); s.classList.add('working'); s.querySelector('b').textContent = tx('working');
-    setTimeout(() => { s.classList.remove('working'); s.classList.add('ready'); s.querySelector('b').textContent = tx('analysisReady'); answer('attention', '#agent-answer'); }, 620);
+    const goal = $('#agent-input').value.trim();
+    setTimeout(() => { s.classList.remove('working'); s.classList.add('ready'); s.querySelector('b').textContent = tx('analysisReady'); answer('attention', '#agent-answer'); auditedAgentRun('free', goal, '#agent-answer'); }, 620);
   });
 }
 
@@ -497,4 +591,5 @@ setup();
 setupTelemetryControls();
 setupGisControls();
 startTelemetry();
+loadLive();
 setTimeout(() => $('#loading-wash').classList.add('hide'), 560);

@@ -40,6 +40,8 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - hash-chained, append-only audit log for report transitions, approvals and agent runs
 - release-readiness policy: no high-impact output is release-ready without decision-grade evidence and a named approved review
 - engine-generated browser data pack: every number in the preview is produced by the deterministic engine and verified against it
+- local decision API: report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate is interactive
+- PostgreSQL adapters for the audit log, memory store and report state behind the same interfaces, with a database-level append-only guard on audit rows
 - local verification, packaged build smoke test and static preview smoke test, with a GitHub Actions activation template
 
 > **Important:** KPI formulas and thresholds included in the demo are synthetic examples only. They are not RTA contractual definitions and must be replaced by formally approved rules before production. The portfolio forecast is exploratory decision support, not a committed budget, cash forecast or contractual entitlement.
@@ -65,6 +67,32 @@ npm run check:web-data   # fails when the committed file drifts from the engine 
 ```
 
 The browser layer owns bilingual labels and layout only. If a number on screen is wrong, fix the engine or the synthetic data in `src/demo.ts`, regenerate, and commit the result.
+
+### Local decision API
+
+`server.mjs` hosts the static preview and a small JSON API implemented in `src/api/router.ts`. It mutates RailMind-owned state only (report status, audit trail, agent memory) and never writes to Maximo, finance or contract systems.
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/api/health` | service status and active persistence mode |
+| GET | `/api/report` | current report package, readiness (next transitions and blockers) and its audit trail |
+| POST | `/api/report/transition` | `{ type, actorId, actorRole?, note?, at? }` with `type` one of `submit_for_review`, `approve`, `reject`, `lock`; refused transitions return 409 with blockers and are audited |
+| POST | `/api/report/reset` | `{ actorId }` restores the demo package; audited |
+| POST | `/api/agent/task` | `{ capability, actorId, goal, riskClass, actionMode }` routes through the kernel; planned or blocked runs are audited and recorded in episodic memory |
+| GET | `/api/audit` | all audit events with hash-chain verification |
+| GET | `/api/agents` | the registered agent catalog |
+
+P0 has no authentication. The named actor is supplied by the caller and recorded as given. Authentication and role-based access control are release gates before any live data.
+
+### Persistence
+
+Without `DATABASE_URL` all state is in memory and resets on restart. With `DATABASE_URL` set, the server uses the PostgreSQL adapters in `src/persistence/postgres.ts` through the optional `pg` driver and creates the schema from `infra/sql/001_railmind_core.sql` on start. Audit rows are protected by a database trigger that rejects `UPDATE` and `DELETE`.
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+DATABASE_URL=postgres://railmind:local_only_change_me@localhost:5432/railmind npm run serve
+DATABASE_URL=... npm test   # also runs the live PostgreSQL integration test
+```
 
 ## Replit
 

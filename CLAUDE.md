@@ -28,12 +28,14 @@ Current stage: **P0 synthetic demo**. Nothing here is connected to live RTA, Max
 ```
 src/
   agent-os/        contracts (types), policy (P0 execution rules + release readiness), catalog (7 agents), kernel (deterministic routing), memory (in-memory store)
+  api/router.ts    local decision API (report transitions, reset, audited agent planning, audit trail); runtime-neutral, hosted by server.mjs
   audit/           append-only, SHA-256 hash-chained audit log (in-memory adapter)
+  persistence/     SQL ports, PostgreSQL adapters (audit, memory, report store), lazy `pg` loader
   connectors/maximo/ port (anti-corruption interfaces), client (read-only REST adapter), mock (in-memory port)
   data/canonical.ts  canonical decision projections (asset, work order, invoice, contract, snapshot)
   kpi/             engine (availability, failure count, MTBF, MTTR, backlog) + demo definitions
   exceptions/      exception severity from KPI observations (breach + prior breaches -> critical)
-  reporting/       contracts (KPI observation, exception, report package) + generator (deterministic executive summary) + approval (state machine)
+  reporting/       contracts, generator (deterministic executive summary), approval (state machine), store (report state port)
   llm/             OpenAI-compatible gateway (fetch only) + grounded report-narrative prompt
   forecast/        deterministic P25/P50/P75 schedule-adjusted expenditure pace model
   control-tower/   view model counts for the Control Tower
@@ -46,8 +48,9 @@ web/
   styles.css       single-file design system
   portfolio.html   self-contained sanitised portfolio dashboard, embedded in an iframe
 index.html         application shell
-server.mjs         zero-dependency static server with /api/health
-tests/             node:test suites (38 tests)
+server.mjs         static server + decision API; in-memory adapters by default, PostgreSQL when DATABASE_URL is set
+infra/sql/         schema for RailMind-owned tables (audit rows append-only by trigger)
+tests/             node:test suites (50 tests; the live PostgreSQL test is skipped unless DATABASE_URL is set)
 scripts/           build-web-data.mjs, check-web-data.mjs, check-portfolio.mjs, package-smoke.mjs
 docs/              product authority, architecture, data contract, pilot plan, status, reviews, deployment
 infra/             optional PostgreSQL + pgvector compose file
@@ -61,7 +64,7 @@ npm run verify          # typecheck + web syntax + web data drift + portfolio ch
 npm test                # node --experimental-strip-types --test tests/*.test.ts
 npm run build:web-data  # regenerate web/data/demo-pack.js after changing src/demo.ts or the engine
 npm run build           # emit dist/ (ESM + declarations)
-npm run serve           # http://localhost:4173  (Replit uses PORT=5000)
+npm run serve           # http://localhost:4173  (Replit uses PORT=5000); DATABASE_URL=... enables PostgreSQL
 ```
 
 Run `npm run verify` before every commit. All tests must pass. If you change `src/demo.ts`, the KPI engine, exceptions, reporting or approval logic, run `npm run build:web-data` and commit the regenerated pack.
@@ -72,6 +75,7 @@ Run `npm run verify` before every commit. All tests must pass. If you change `sr
 - Imports inside `src/` and `tests/` use explicit `.ts` extensions (Node strip-types runtime). The build rewrites them to `.js` in `dist/`.
 - Tests use `node:test` and `node:assert/strict`. No test framework dependency.
 - Keep modules small and pure. Deterministic functions take inputs and return values; no hidden state.
+- `src/` must not import Node-only modules or types (`node:*`, `Buffer`). The API uses structural request/response types so the domain layer stays runtime-neutral and typechecks without `@types/node`.
 - Web code is plain ES modules, no bundler. Keep Arabic as the default language and preserve RTL layout. Every user-facing string needs both Arabic and English.
 - Prose in docs: no em dashes. Short sentences. Facts, assumptions, risks and recommendations kept separate.
 - Do not put a model name or AI identifier in commits, code comments or docs.
@@ -80,8 +84,9 @@ Run `npm run verify` before every commit. All tests must pass. If you change `sr
 
 - No GitHub Actions workflow is active. `docs/CI_WORKFLOW_TEMPLATE.yml` must be moved to `.github/workflows/ci.yml` once the workflows permission exists.
 - No authentication, RBAC or data classification exists yet. These are release gates before any live data.
-- Audit log and memory store are in-memory adapters. A PostgreSQL adapter behind the same interfaces is the next persistence step.
-- The browser preview shows the approval gate but cannot execute transitions; transitions run only in the domain layer and tests. A thin local API or an in-browser build of the engine would be needed for interactive approval.
+- The API has no authentication. Actor id and role are caller-supplied and recorded as given. Bind them to an authenticated principal before live data.
+- Only one report package (the demo seed) is served. Multi-report and multi-contract scoping is not built.
+- The KPI values in the preview still come from the generated pack, not from the API. Only report status, readiness and audit are live.
 - PM compliance KPI, data-quality service, contract-context port and finance-context port are documented but not implemented.
 - GIS positions, station names and routing defaults (owner, due window) in `web/app.js` are presentation placeholders, not engine outputs. They are labelled as such in the code.
 
@@ -93,6 +98,8 @@ Run `npm run verify` before every commit. All tests must pass. If you change `sr
 - `src/index.ts` exports every module.
 - `web/app.js` no longer hard-codes any number. The previous UI showed MTBF 183.5 h while the engine computes 183.25 h, and showed three exceptions while the engine produces two. Both drifts are gone.
 - Telemetry no longer perturbs KPI values with synthetic noise. It replays the period event by event with the engine recomputing each KPI.
+- Approval gate is interactive through the local API with a named actor; every transition, refusal, reset and agent plan is audited and the chain is verified on read.
+- PostgreSQL adapters exist for audit, memory and report state, verified live against PostgreSQL 16 including the append-only trigger.
 
 ## Intended direction (see docs/P0_PILOT_PLAN.md)
 

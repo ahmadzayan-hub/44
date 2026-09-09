@@ -11,6 +11,7 @@ export type AuditAction =
   | 'report.rejected'
   | 'report.locked'
   | 'report.transition_refused'
+  | 'report.reset'
   | 'agent.run_planned'
   | 'agent.run_blocked'
   | 'proposal.created';
@@ -45,6 +46,12 @@ export interface AuditLog {
 
 export const GENESIS_HASH = '0'.repeat(64);
 
+/** Timestamps are hashed in normalised ISO form so a database round-trip cannot change the hash. */
+function isoOrRaw(value: string): string {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
+}
+
 function canonical(input: AuditEventInput, sequence: number, previousHash: string): string {
   return JSON.stringify({
     sequence,
@@ -54,7 +61,7 @@ function canonical(input: AuditEventInput, sequence: number, previousHash: strin
     actorRole: input.actorRole ?? null,
     subjectType: input.subjectType,
     subjectId: input.subjectId,
-    at: input.at,
+    at: isoOrRaw(input.at),
     fromState: input.fromState ?? null,
     toState: input.toState ?? null,
     reason: input.reason ?? null,
@@ -62,7 +69,7 @@ function canonical(input: AuditEventInput, sequence: number, previousHash: strin
       sourceSystem: ref.sourceSystem,
       entityType: ref.entityType,
       entityId: ref.entityId,
-      observedAt: ref.observedAt,
+      observedAt: isoOrRaw(ref.observedAt),
       sourceUri: ref.sourceUri ?? null,
       snapshotHash: ref.snapshotHash ?? null,
     })),

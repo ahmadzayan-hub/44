@@ -14,10 +14,13 @@
     "check:portfolio": "node scripts/check-portfolio.mjs",
     "check:package": "npm run build && node scripts/package-smoke.mjs",
     "verify": "npm run typecheck && npm run check:web && npm run check:web-data && npm run check:portfolio && npm test && npm run check:package",
-    "serve": "node server.mjs",
-    "start": "node server.mjs"
+    "serve": "node --experimental-strip-types server.mjs",
+    "start": "node --experimental-strip-types server.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2"
+  },
+  "optionalDependencies": {
+    "pg": "^8.13.0"
   }
 }
