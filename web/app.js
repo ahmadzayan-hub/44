@@ -19,7 +19,9 @@ const state = {
   /* Authenticated principal from /api/auth/me. Token kept in sessionStorage only. */
   auth: { token: null, principal: null, permissions: [], mode: null, identities: [] },
   telemetry: { active: true, timer: null, index: pack.timeline.length - 1, eventId: 0, lastSignalAt: null },
-  gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true }, selected: null, eventLabel: null },
+  gis: { zoom: 1, filter: 'all', layers: { assets: true, faults: true, workorders: true, trains: true }, selected: null, eventLabel: null, train: { cycle: 0, active: 'train-r01', lastEvent: null } },
+  /* Predictive signals come from the failure-risk agent through the API; the browser never scores anything. */
+  predictive: { loadedAt: null, assessments: null, runRef: null },
 };
 
 /* ---------- Presentation metadata (labels only, no numbers) ---------- */
@@ -257,10 +259,11 @@ async function signIn(token) {
   state.auth.principal = me.json.principal; state.auth.permissions = me.json.permissions;
   toast(tx('signedIn'));
   renderIdentity();
+  renderPredictiveAlerts();
   await loadLive();
 }
 
-function signOut() { setToken(null); toast(tx('signedOut')); renderIdentity(); state.live = { ...state.live, available: false }; renderReports(); }
+function signOut() { setToken(null); toast(tx('signedOut')); renderIdentity(); state.live = { ...state.live, available: false }; state.predictive = { loadedAt: null, assessments: null, runRef: null }; renderReports(); renderPredictiveAlerts(); }
 
 function renderIdentity() {
   const p = state.auth.principal;
@@ -434,11 +437,54 @@ function renderEvidenceChain() {
   items[2].textContent = isAr() ? 'قيد مراجعة بشرية' : en.awaitingReview;
 }
 
+/* ---------- Predictive maintenance signals (API-sourced) ---------- */
+
+const predictiveCopy = {
+  ar: { kicker: 'صيانة استباقية · وكيل ذكاء الأصول', title: 'إشارات الصيانة الاستباقية', description: 'درجات مخاطر حتمية يحسبها وكيل مخاطر الأعطال في الخادم من منافذ الحالة وMaximo، وتُسجَّل في سجل التدقيق. لا يحسب المتصفح أي درجة، ولا تمثل تشخيصاً أو إنذاراً حياً.', count: 'أصول تتطلب مراجعة', model: 'railmind-legacy-v1', stream: 'مصدر الدرجات', boundary: '⌑ إشارات للقراءة والمراجعة فقط. لا يتم إنشاء أمر عمل أو تنفيذ أي إجراء تشغيلي تلقائياً. الأوزان تجريبية غير معايرة.', score: 'درجة المخاطر', driver: 'المحرك الرئيسي', route: 'افتح في الخريطة', source: 'مرجع التدقيق', review: 'مراجعة مهندس مُسمى', action: 'إجراء مقترح', load: 'حمّل الإشارات من وكيل مخاطر الأعطال', signInHint: 'سجّل الدخول بدور مهندس أو أعلى لتحميل الإشارات من الخادم.', empty: 'لم تُحمَّل إشارات بعد.', status: { critical: 'حرج', high: 'مرتفع', watch: 'متابعة', good: 'مستقر' } },
+  en: { kicker: 'PREDICTIVE MAINTENANCE · ASSET INTELLIGENCE AGENT', title: 'Predictive maintenance signals', description: 'Deterministic risk scores computed server-side by the failure-risk agent from condition and Maximo ports and recorded in the audit trail. The browser scores nothing; this is not a live diagnosis or alarm.', count: 'assets need review', model: 'railmind-legacy-v1', stream: 'Score source', boundary: '⌑ Read and review only. No work order is created and no operational action is executed automatically. Weights are uncalibrated demo values.', score: 'Risk score', driver: 'Main driver', route: 'Open in map', source: 'Audit reference', review: 'Named engineer review', action: 'Proposed action', load: 'Load signals from the failure-risk agent', signInHint: 'Sign in as engineer or above to load signals from the server.', empty: 'No signals loaded yet.', status: { critical: 'Critical', high: 'High', watch: 'Watch', good: 'Stable' } },
+};
+const gisNodeForAsset = { 'ATC-ZC-01': 'atc', 'ATC-ZC-02': 'atc', 'TRAM-APS-03': 'fault' };
+const actionLabels = { ar: { inspect: 'فحص', schedule_pm: 'جدولة صيانة وقائية', replace_component: 'استبدال مكوّن', monitor: 'مراقبة' }, en: { inspect: 'Inspect', schedule_pm: 'Schedule PM', replace_component: 'Replace component', monitor: 'Monitor' } };
+
+async function loadPredictiveAlerts() {
+  if (!can('agent.run')) { toast(tx('signInFirst')); return; }
+  const result = await api('/api/agent/run', { capability: 'failure-risk', goal: 'Predictive maintenance signals', riskClass: 'operational', actionMode: 'analyse' });
+  if (result.status !== 200) { toast(tx('blocked')); return; }
+  state.predictive = { loadedAt: result.json.completedAt, assessments: result.json.output.value.assessments, runRef: `#${result.json.auditSequences.join(', #')}` };
+  renderPredictiveAlerts();
+}
+
+function renderPredictiveAlerts() {
+  const root = $('#predictive-alert-list');
+  if (!root) return;
+  const copy = predictiveCopy[state.language];
+  const list = state.predictive.assessments ?? [];
+  const severityOf = (band) => (band === 'high' ? 'critical' : band === 'medium' ? 'high' : 'good');
+  const attention = list.filter((a) => a.riskBand !== 'low').length;
+  $('#predictive-kicker').textContent = copy.kicker;
+  $('#predictive-title').textContent = copy.title;
+  $('#predictive-description').textContent = copy.description;
+  $('#predictive-count').textContent = String(attention).padStart(2, '0');
+  $('#predictive-count-label').textContent = copy.count;
+  $('#predictive-model-state').textContent = copy.model;
+  $('#predictive-stream-label').textContent = copy.stream;
+  $('#predictive-stream-detail').textContent = state.predictive.runRef ? `${copy.source} ${state.predictive.runRef}` : '—';
+  $('#predictive-boundary').textContent = copy.boundary;
+  if (!list.length) {
+    root.innerHTML = `<div class="predictive-empty"><p>${state.auth.principal ? copy.empty : copy.signInHint}</p><button type="button" class="approval-action" id="predictive-load" ${can('agent.run') ? '' : 'disabled'}>✦ ${copy.load}</button></div>`;
+    $('#predictive-load')?.addEventListener('click', loadPredictiveAlerts);
+    return;
+  }
+  root.innerHTML = list.map((a) => { const severity = severityOf(a.riskBand); const top = a.drivers[0]; const node = gisNodeForAsset[a.assetId]; return `<article class="predictive-alert predictive-alert--${severity}" data-predictive-alert="${a.assetId}"><div class="predictive-alert__head"><span class="predictive-alert__icon">✦</span><div><div class="predictive-alert__title"><b dir="ltr">${a.assetId}</b><span class="predictive-alert__status">${copy.status[severity]}</span></div><small>${a.name}</small></div><div class="predictive-alert__score"><strong>${a.riskScore}<small>/100</small></strong><span>${copy.score}</span></div></div><div class="predictive-alert__details"><div><small>${copy.driver}</small><b>${top ? `${top.name} · ${Math.round(top.contribution * 100)}%` : '—'}</b></div><div><small>${copy.action}</small><b>${actionLabels[state.language][a.recommendation.action]} · ${a.recommendation.withinHours}h${a.recommendation.requiresEngineerReview ? ` · ${copy.review}` : ''}</b></div></div><div class="predictive-alert__footer"><span>⌁ <small>${copy.source}</small> <b dir="ltr">${state.predictive.runRef}</b></span>${node ? `<button type="button" data-predictive-node="${node}">${copy.route} <i>↗</i></button>` : ''}</div></article>`; }).join('') + `<div class="predictive-empty"><button type="button" class="approval-reset" id="predictive-load">↻ ${copy.load}</button></div>`;
+  $$('[data-predictive-node]').forEach((button) => button.addEventListener('click', () => { switchView('network'); openGisInspector(button.dataset.predictiveNode); window.setTimeout(() => $('#gis-inspector')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 120); }));
+  $('#predictive-load')?.addEventListener('click', loadPredictiveAlerts);
+}
+
 /* ---------- GIS ---------- */
 
 const gisCopy = {
-  ar: { kicker: 'نموذج GIS تشغيلي', title: 'خريطة شبكة الخط الأحمر', description: 'اعرض طبقات الأصول والأعطال وأوامر العمل في سياق شبكي توضيحي. جميع المواقع والحالات اصطناعية ومحلية.', boundaryTitle: 'محاكاة محلية', boundaryCopy: 'لا توجد إحداثيات أو بيانات تشغيلية حية', layersTitle: 'طبقات الخريطة', layersCopy: 'اختر ما يظهر في مساحة العمل', assets: 'الأصول', faults: 'الأعطال', workorders: 'أوامر العمل', filter: 'تصفية الحالة', clear: 'مسح', all: 'الكل', critical: 'حرج', watch: 'متابعة', stable: 'مستقر', streamTitle: 'متزامن مع المحاكاة', streamCopy: 'تُحدّث الحالات عند وصول إشارة TLM', mapMode: 'عرض تشغيلي', mapScope: 'نطاق تجريبي · الخط الأحمر', centre: 'المركز المالي', museum: 'منطقة المتحف', marina: 'المارينا', terminal: 'المحطة الطرفية', atc: 'تحكم آلي · متابعة', signal: 'إشارات · مستقر', fault: 'تنبيه MTTR', woOne: 'مفتوح · PM', woTwo: 'مجدول', captionTitle: 'محاكاة شبكة حضرية', captionCopy: 'لا تمثل الموقع أو الأبعاد أو مسار دبي مترو الفعلي.', inspectorTitle: 'مستكشف الشبكة', inspectorCopy: 'اختر محطة أو رمزاً على الخريطة لمراجعة الحالة والأدلة وارتباط القرار.', evidence: 'مسار الدليل', decision: 'عرض حزمة القرار ↗', statusTitle: 'الشبكة مستقرة ضمن نطاق العرض التجريبي', station: 'محطة', asset: 'أصل', faultType: 'تنبيه عطل', workorder: 'أمر عمل', statusStable: 'مستقر', statusWatch: 'متابعة', statusCritical: 'حرج', telemetry: 'آخر إشارة توضيحية' },
-  en: { kicker: 'OPERATIONAL GIS MODEL', title: 'Red Line network map', description: 'Review asset, fault, and work-order layers in an illustrative network context. All positions and states are synthetic and local.', boundaryTitle: 'Local simulation', boundaryCopy: 'No live coordinates or operational data', layersTitle: 'Map layers', layersCopy: 'Choose what is visible in the workspace', assets: 'Assets', faults: 'Faults', workorders: 'Work orders', filter: 'Filter by state', clear: 'Clear', all: 'All', critical: 'Critical', watch: 'Watch', stable: 'Stable', streamTitle: 'Synced to simulation', streamCopy: 'States update when a TLM signal arrives', mapMode: 'Operational view', mapScope: 'Pilot scope · Red Line', centre: 'Financial Centre', museum: 'Museum District', marina: 'Marina', terminal: 'Terminal', atc: 'ATC · Watch', signal: 'Signalling · Stable', fault: 'MTTR alert', woOne: 'Open · PM', woTwo: 'Scheduled', captionTitle: 'Urban network simulation', captionCopy: 'Does not represent the location, dimensions, or actual Dubai Metro alignment.', inspectorTitle: 'Network explorer', inspectorCopy: 'Select a station or symbol to review state, evidence, and decision linkage.', evidence: 'Evidence trail', decision: 'Open decision pack ↗', statusTitle: 'Network stable within the illustrative scope', station: 'Station', asset: 'Asset', faultType: 'Fault alert', workorder: 'Work order', statusStable: 'Stable', statusWatch: 'Watch', statusCritical: 'Critical', telemetry: 'Latest illustrative signal' },
+  ar: { kicker: 'نموذج GIS تشغيلي', title: 'خريطة شبكة الخط الأحمر', description: 'اعرض طبقات الأصول والأعطال وأوامر العمل في سياق شبكي توضيحي. جميع المواقع والحالات اصطناعية ومحلية.', boundaryTitle: 'محاكاة محلية', boundaryCopy: 'لا توجد إحداثيات أو بيانات تشغيلية حية', layersTitle: 'طبقات الخريطة', layersCopy: 'اختر ما يظهر في مساحة العمل', assets: 'الأصول', faults: 'الأعطال', workorders: 'أوامر العمل', trains: 'حركة القطارات', trainsCount: '3 قطارات محاكاة محلية', trainHudTitle: 'حركة قطارات محاكاة محلية', trainHudCopy: '3 رحلات توضيحية على الخط الأحمر', train: 'قطار', filter: 'تصفية الحالة', clear: 'مسح', all: 'الكل', critical: 'حرج', watch: 'متابعة', stable: 'مستقر', streamTitle: 'متزامن مع المحاكاة', streamCopy: 'تُحدّث الحالات عند وصول إشارة TLM', mapMode: 'عرض تشغيلي', mapScope: 'نطاق تجريبي · الخط الأحمر', centre: 'المركز المالي', museum: 'منطقة المتحف', marina: 'المارينا', terminal: 'المحطة الطرفية', atc: 'تحكم آلي · متابعة', signal: 'إشارات · مستقر', fault: 'تنبيه MTTR', woOne: 'مفتوح · PM', woTwo: 'مجدول', captionTitle: 'محاكاة شبكة حضرية', captionCopy: 'لا تمثل الموقع أو الأبعاد أو مسار دبي مترو الفعلي.', inspectorTitle: 'مستكشف الشبكة', inspectorCopy: 'اختر محطة أو رمزاً على الخريطة لمراجعة الحالة والأدلة وارتباط القرار.', evidence: 'مسار الدليل', decision: 'عرض حزمة القرار ↗', statusTitle: 'الشبكة مستقرة ضمن نطاق العرض التجريبي', station: 'محطة', asset: 'أصل', faultType: 'تنبيه عطل', workorder: 'أمر عمل', statusStable: 'مستقر', statusWatch: 'متابعة', statusCritical: 'حرج', telemetry: 'آخر إشارة توضيحية' },
+  en: { kicker: 'OPERATIONAL GIS MODEL', title: 'Red Line network map', description: 'Review asset, fault, and work-order layers in an illustrative network context. All positions and states are synthetic and local.', boundaryTitle: 'Local simulation', boundaryCopy: 'No live coordinates or operational data', layersTitle: 'Map layers', layersCopy: 'Choose what is visible in the workspace', assets: 'Assets', faults: 'Faults', workorders: 'Work orders', trains: 'Train movement', trainsCount: '3 locally simulated trains', trainHudTitle: 'Local simulated train movement', trainHudCopy: '3 illustrative services on the Red Line', train: 'Train', filter: 'Filter by state', clear: 'Clear', all: 'All', critical: 'Critical', watch: 'Watch', stable: 'Stable', streamTitle: 'Synced to simulation', streamCopy: 'States update when a TLM signal arrives', mapMode: 'Operational view', mapScope: 'Pilot scope · Red Line', centre: 'Financial Centre', museum: 'Museum District', marina: 'Marina', terminal: 'Terminal', atc: 'ATC · Watch', signal: 'Signalling · Stable', fault: 'MTTR alert', woOne: 'Open · PM', woTwo: 'Scheduled', captionTitle: 'Urban network simulation', captionCopy: 'Does not represent the location, dimensions, or actual Dubai Metro alignment.', inspectorTitle: 'Network explorer', inspectorCopy: 'Select a station or symbol to review state, evidence, and decision linkage.', evidence: 'Evidence trail', decision: 'Open decision pack ↗', statusTitle: 'Network stable within the illustrative scope', station: 'Station', asset: 'Asset', faultType: 'Fault alert', workorder: 'Work order', statusStable: 'Stable', statusWatch: 'Watch', statusCritical: 'Critical', telemetry: 'Latest illustrative signal' },
 };
 
 const mttrText = () => { const k = pack.kpis.find((item) => item.id === 'mttr'); return `MTTR ${fmtValue('mttr', k.value)}${unit(k.unit)}`; };
@@ -454,13 +500,16 @@ const gisRecords = () => ({
   signal: { type: 'asset', status: 'stable', arName: 'SIG-CB-14', enName: 'SIG-CB-14', arContext: 'أصل إشارات مستقر في العينة، يُعرض لتوضيح طبقة الأصول فقط.', enContext: 'A stable signalling asset in the sample, shown to illustrate the asset layer only.', arFacts: [['الفئة', 'إشارات'], ['الحالة', 'مستقر'], ['أوامر عمل', 'لا يوجد في العينة']], enFacts: [['Class', 'Signalling'], ['State', 'Stable'], ['Work orders', 'None in sample']], evidence: 'GIS Demo · SIG-CB-14', decision: 'availability' },
   fault: { type: 'faultType', status: 'critical', arName: 'تنبيه MTTR متكرر', enName: 'Persistent MTTR alert', arContext: 'تنبيه استثنائي تولّده قواعد KPI التجريبية، وليس إنذاراً مباشراً من نظام تحكم.', enContext: 'An exception alert generated by demo KPI rules, not a direct control-system alarm.', arFacts: [['الشدة', 'حرج'], ['قاعدة KPI', `MTTR ${pack.provenance.formulaVersion}`], ['الحالة', 'مراجعة بشرية']], enFacts: [['Severity', 'Critical'], ['KPI rule', `MTTR ${pack.provenance.formulaVersion}`], ['State', 'Human review']], evidence: 'Maximo Demo · WO-1001…WO-1004', decision: 'mttr' },
   'wo-1': { type: 'workorder', status: 'watch', arName: 'WO-1005', enName: 'WO-1005', arContext: 'أمر صيانة وقائية مفتوح ضمن الحزمة الاصطناعية، ويتطلب تأكيد الجدولة.', enContext: 'An open preventive-maintenance order in the synthetic pack, requiring schedule confirmation.', arFacts: [['الحالة', pack.workOrders.find((w) => w.workOrderId === 'WO-1005').status], ['الفئة', 'صيانة وقائية'], ['الاستحقاق', 'يوم عمل']], enFacts: [['State', pack.workOrders.find((w) => w.workOrderId === 'WO-1005').status], ['Class', 'Preventive maintenance'], ['Due', 'One business day']], evidence: 'Maximo Demo · WO-1005', decision: 'backlog' },
+  'train-r01': { type: 'train', status: 'stable', arName: 'قطار R01', enName: 'Train R01', arContext: 'قطار تمثيلي يتحرك ضمن نموذج الخط الأحمر المحلي. لا يمثل رحلة أو موقعاً فعلياً.', enContext: 'An illustrative train moving within the local Red Line model. It does not represent a live service or location.', arFacts: [['الحالة', 'حركة محاكاة'], ['المسار', 'الخط الأحمر التوضيحي'], ['المصدر', 'TLM محلي']], enFacts: [['State', 'Simulated movement'], ['Route', 'Illustrative Red Line'], ['Source', 'Local TLM']], evidence: 'GIS Demo · TR-R01', decision: 'availability' },
+  'train-r02': { type: 'train', status: 'watch', arName: 'قطار R02', enName: 'Train R02', arContext: 'قطار تمثيلي في حالة متابعة ضمن العرض المحلي. لا يمثل تنبيهاً من منظومة تحكم أو رحلة فعلية.', enContext: 'An illustrative train in a watch state within the local presentation. It is not a control-system alert or live service.', arFacts: [['الحالة', 'متابعة محاكاة'], ['السياق', 'مراجعة توضيحية'], ['المصدر', 'TLM محلي']], enFacts: [['State', 'Simulation watch'], ['Context', 'Illustrative review'], ['Source', 'Local TLM']], evidence: 'GIS Demo · TR-R02', decision: 'mttr' },
+  'train-r03': { type: 'train', status: 'stable', arName: 'قطار R03', enName: 'Train R03', arContext: 'قطار تمثيلي ثانٍ يعرض تباعد الحركة داخل المخطط المحلي فقط.', enContext: 'A second illustrative train that visualises service separation within the local schematic only.', arFacts: [['الحالة', 'حركة محاكاة'], ['المسار', 'الخط الأحمر التوضيحي'], ['المصدر', 'TLM محلي']], enFacts: [['State', 'Simulated movement'], ['Route', 'Illustrative Red Line'], ['Source', 'Local TLM']], evidence: 'GIS Demo · TR-R03', decision: 'backlog' },
   'wo-2': { type: 'workorder', status: 'stable', arName: 'WO-1006', enName: 'WO-1006', arContext: 'أمر عمل مجدول في المحاكاة، مع مسار دليل يمكن عرضه قبل اتخاذ القرار.', enContext: 'A scheduled work order in the simulation, with an evidence trail available before a decision.', arFacts: [['الحالة', pack.workOrders.find((w) => w.workOrderId === 'WO-1006').status], ['الفئة', 'صيانة وقائية'], ['الاستحقاق', 'مؤكد']], enFacts: [['State', pack.workOrders.find((w) => w.workOrderId === 'WO-1006').status], ['Class', 'Preventive maintenance'], ['Due', 'Confirmed']], evidence: 'Maximo Demo · WO-1006', decision: 'backlog' },
 });
 
 function renderGisText() {
   if (!$('#view-network')) return;
   const copy = gisCopy[state.language];
-  const values = { 'gis-kicker': 'kicker', 'gis-title': 'title', 'gis-description': 'description', 'gis-boundary-title': 'boundaryTitle', 'gis-boundary-copy': 'boundaryCopy', 'gis-layers-title': 'layersTitle', 'gis-layers-copy': 'layersCopy', 'gis-assets-label': 'assets', 'gis-faults-label': 'faults', 'gis-workorders-label': 'workorders', 'gis-filter-label': 'filter', 'gis-clear-filter': 'clear', 'gis-stream-title': 'streamTitle', 'gis-stream-copy': 'streamCopy', 'gis-map-mode': 'mapMode', 'gis-map-scope': 'mapScope', 'gis-station-centre': 'centre', 'gis-station-museum': 'museum', 'gis-station-marina': 'marina', 'gis-station-terminal': 'terminal', 'gis-atc-label': 'atc', 'gis-signal-label': 'signal', 'gis-fault-label': 'fault', 'gis-wo-1-label': 'woOne', 'gis-wo-2-label': 'woTwo', 'gis-caption-title': 'captionTitle', 'gis-caption-copy': 'captionCopy', 'gis-inspector-title': 'inspectorTitle', 'gis-inspector-copy': 'inspectorCopy', 'gis-evidence-label': 'evidence', 'gis-open-decision': 'decision', 'gis-status-strip-title': 'statusTitle' };
+  const values = { 'gis-kicker': 'kicker', 'gis-title': 'title', 'gis-description': 'description', 'gis-boundary-title': 'boundaryTitle', 'gis-boundary-copy': 'boundaryCopy', 'gis-layers-title': 'layersTitle', 'gis-layers-copy': 'layersCopy', 'gis-assets-label': 'assets', 'gis-faults-label': 'faults', 'gis-workorders-label': 'workorders', 'gis-trains-label': 'trains', 'gis-trains-count': 'trainsCount', 'gis-train-hud-title': 'trainHudTitle', 'gis-train-hud-copy': 'trainHudCopy', 'gis-filter-label': 'filter', 'gis-clear-filter': 'clear', 'gis-stream-title': 'streamTitle', 'gis-stream-copy': 'streamCopy', 'gis-map-mode': 'mapMode', 'gis-map-scope': 'mapScope', 'gis-station-centre': 'centre', 'gis-station-museum': 'museum', 'gis-station-marina': 'marina', 'gis-station-terminal': 'terminal', 'gis-atc-label': 'atc', 'gis-signal-label': 'signal', 'gis-fault-label': 'fault', 'gis-wo-1-label': 'woOne', 'gis-wo-2-label': 'woTwo', 'gis-caption-title': 'captionTitle', 'gis-caption-copy': 'captionCopy', 'gis-inspector-title': 'inspectorTitle', 'gis-inspector-copy': 'inspectorCopy', 'gis-evidence-label': 'evidence', 'gis-open-decision': 'decision', 'gis-status-strip-title': 'statusTitle' };
   Object.entries(values).forEach(([id, key]) => { const element = $(`#${id}`); if (element) element.textContent = copy[key]; });
   $('#gis-assets-count').textContent = isAr() ? `${pack.assets.length} أصول في العينة` : `${pack.assets.length} assets in sample`;
   $('#gis-faults-count').textContent = isAr() ? `${criticalCount()} استثناء حرج` : `${criticalCount()} critical exception(s)`;
@@ -478,10 +527,38 @@ function renderGisStream() {
   const copy = gisCopy[state.language];
   const event = state.gis.eventLabel || (isAr() ? 'TLM-000 · جاهز' : 'TLM-000 · Ready');
   $('#gis-map-events').textContent = `${copy.telemetry}: ${event}`;
+  renderTrainHud();
+}
+
+/* Train movement is a presentation-only simulation. It never represents live train positions. */
+const trainSimulation = [
+  { id: 'train-r01', code: 'R01', ar: 'R01 يتجه داخل المسار التوضيحي', en: 'R01 progressing on the illustrative route' },
+  { id: 'train-r02', code: 'R02', ar: 'R02 في نقطة متابعة توضيحية', en: 'R02 at an illustrative watch point' },
+  { id: 'train-r03', code: 'R03', ar: 'R03 يحافظ على تباعد محاكاة محلي', en: 'R03 maintaining local simulated separation' },
+];
+
+function renderTrainHud() {
+  const hud = $('#gis-train-hud');
+  if (!hud) return;
+  const copy = gisCopy[state.language];
+  const current = trainSimulation[state.gis.train.cycle % trainSimulation.length];
+  $('#gis-train-hud-title').textContent = copy.trainHudTitle;
+  $('#gis-train-hud-copy').textContent = state.gis.train.lastEvent || copy.trainHudCopy;
+  $('#gis-train-hud-code').textContent = current.code;
+  $$('.gis-train-marker').forEach((marker) => marker.classList.toggle('gis-train-marker--active', marker.dataset.gisNode === state.gis.train.active));
+}
+
+function advanceTrainSimulation() {
+  const train = state.gis.train;
+  train.cycle = (train.cycle + 1) % trainSimulation.length;
+  const current = trainSimulation[train.cycle];
+  train.active = current.id;
+  train.lastEvent = `${current.code} · ${isAr() ? current.ar : current.en}`;
+  renderTrainHud();
 }
 
 function applyGisFilters() {
-  $$('.gis-station,.gis-asset-marker,.gis-fault-marker,.gis-workorder-marker').forEach((item) => {
+  $$('.gis-station,.gis-asset-marker,.gis-fault-marker,.gis-workorder-marker,.gis-train-marker').forEach((item) => {
     const layer = item.dataset.gisItem;
     const visibleLayer = !layer || state.gis.layers[layer];
     const visibleState = state.gis.filter === 'all' || item.dataset.status === state.gis.filter;
@@ -564,6 +641,7 @@ function emitTelemetry() {
   applySnapshotToCards();
   stream.lastSignalAt = new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   state.gis.eventLabel = `${tx('telemetryEventPrefix')}-${String(stream.eventId).padStart(3, '0')} · ${currentSnapshot().trigger}`;
+  advanceTrainSimulation();
   renderTelemetry();
   renderGisStream();
 }
@@ -587,8 +665,12 @@ function resetTelemetry() {
   state.telemetry.index = pack.timeline.length - 1;
   state.telemetry.eventId = 0;
   state.telemetry.lastSignalAt = null;
+  state.gis.train.cycle = 0;
+  state.gis.train.active = 'train-r01';
+  state.gis.train.lastEvent = null;
   renderKpis();
   renderTelemetry();
+  renderGisStream();
   toast(tx('telemetryReset'));
 }
 
@@ -634,9 +716,10 @@ function applyLanguage() {
   $('#language-button b').textContent = arabic ? 'EN' : 'ع';
   renderAll();
   renderTelemetry();
+  if (state.gis.selected) openGisInspector(state.gis.selected);
 }
 
-function renderAll() { renderKpis(); renderDecisions(); renderExceptionTable(); renderAssets(); renderContract(); renderReports(); renderAgents(); renderPulse(); renderEvidenceChain(); renderGisText(); applyGisFilters(); }
+function renderAll() { renderPredictiveAlerts(); renderKpis(); renderDecisions(); renderExceptionTable(); renderAssets(); renderContract(); renderReports(); renderAgents(); renderPulse(); renderEvidenceChain(); renderGisText(); applyGisFilters(); }
 
 function switchView(view) { $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === view)); $$('.view').forEach((s) => s.classList.toggle('active', s.id === `view-${view}`)); $('#app-shell').classList.remove('menu-open'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
