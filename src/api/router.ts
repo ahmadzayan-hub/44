@@ -5,6 +5,7 @@ import type { MemoryStore } from '../agent-os/memory.ts';
 import type { AgentRuntime } from '../agent-os/orchestrator.ts';
 import { TRANSITION_PERMISSION, hasPermission, permissionsOf, type Permission, type Principal } from '../auth/principal.ts';
 import type { TokenDirectory } from '../auth/token-directory.ts';
+import { securityHeaders } from '../http/security-headers.ts';
 import type { AuditLog } from '../audit/log.ts';
 import { reportReadiness, transitionReport, type ReportTransition } from '../reporting/approval.ts';
 import type { ReportPackage } from '../reporting/contracts.ts';
@@ -66,7 +67,7 @@ class HttpError extends Error {
 }
 
 function send(res: ApiResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...securityHeaders() });
   res.end(JSON.stringify(body));
 }
 

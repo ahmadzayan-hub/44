@@ -27,7 +27,7 @@ function classification(value: string | undefined): DataClassification {
 export function loadConfig(env: Env): AppConfig {
   const port = Number(env.PORT ?? 4173);
   return {
-    port: Number.isFinite(port) && port > 0 ? port : 4173,
+    port: Number.isFinite(port) && port >= 0 ? port : 4173,
     databaseUrl: env.DATABASE_URL?.trim() || null,
     classification: classification(env.DATA_CLASSIFICATION?.trim()),
     usersJson: env.RAILMIND_USERS?.trim() || null,

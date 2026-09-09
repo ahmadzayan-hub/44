@@ -24,6 +24,8 @@ export * from './control-tower/view-model.ts';
 export * from './data/canonical.ts';
 export * from './exceptions/engine.ts';
 export * from './forecast/budget-forecast.ts';
+export * from './http/public-paths.ts';
+export * from './http/security-headers.ts';
 export * from './kpi/demo-definitions.ts';
 export * from './kpi/engine.ts';
 export * from './llm/openai-compatible.ts';
