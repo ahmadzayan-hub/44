@@ -45,7 +45,7 @@ The existing `RailMind` repository is treated as the asset-intelligence referenc
 - contract context port serving approved KPI definition sets (demo set in P0)
 - local decision API: governed agent runs, report transitions, audited agent planning, audit trail and chain verification over HTTP; the browser approval gate and agent workspace are interactive
 - PostgreSQL adapters for the audit log, memory store and report state behind the same interfaces, with a database-level append-only guard on audit rows
-- local verification, packaged build smoke test and static preview smoke test, with a GitHub Actions activation template
+- local verification, packaged build smoke test, static preview smoke test and an active GitHub Actions workflow (`.github/workflows/ci.yml`)
 
 > **Important:** KPI formulas and thresholds included in the demo are synthetic examples only. They are not RTA contractual definitions and must be replaced by formally approved rules before production. The portfolio forecast is exploratory decision support, not a committed budget, cash forecast or contractual entitlement.
 

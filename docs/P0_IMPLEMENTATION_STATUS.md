@@ -28,7 +28,7 @@ Status date: 2026-09-09
 | PostgreSQL persistence | Implemented, optional | `DATABASE_URL` selects `PgAuditLog`, `PgMemoryStore`, `PgReportStore`; schema in `infra/sql/001_railmind_core.sql`; live test runs when `DATABASE_URL` is set |
 | Release-readiness policy | Implemented | `hasApprovedHumanReview`, `isOutputReleaseReady` in `src/agent-os/policy.ts` |
 | Packaged build | Implemented | `npm run build` emits `dist/`; `scripts/package-smoke.mjs` verifies the public surface |
-| CI activation template | Included | `docs/CI_WORKFLOW_TEMPLATE.yml`; move to `.github/workflows/ci.yml` after workflows permission is granted |
+| CI workflow | Active | `.github/workflows/ci.yml` runs verify plus an API and preview smoke test on push and pull request; `docs/CI_WORKFLOW_TEMPLATE.yml` is kept as the reference copy |
 | Production Maximo credentials / object mappings | Pending owner environment | No credentials are stored in GitHub |
 | Approved RTA contractual KPI formulas | Pending formal source | Demo thresholds must not be used operationally |
 | Finance production mapping | Port exists; source mapping pending | Requires approved Maximo finance fields/object structure |
