@@ -62,7 +62,17 @@ const server = createServer(async (req, res) => {
   createReadStream(file).pipe(res);
 });
 
-server.listen(config.port, '0.0.0.0', () => log('info', 'RailMind Agent OS started', { ...describeConfig(config), url: `http://localhost:${server.address().port}`, port: server.address().port }));
+/**
+ * On Vercel the host is invoked as a function: the platform requires the entry
+ * module to export the server and takes over listening itself. Everywhere else
+ * (Replit, Docker, local preview) this file is the process and must listen.
+ */
+if (!process.env.VERCEL) {
+  server.listen(config.port, '0.0.0.0', () => log('info', 'RailMind Agent OS started', { ...describeConfig(config), url: `http://localhost:${server.address().port}`, port: server.address().port }));
+}
+
+export default server;
+
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
