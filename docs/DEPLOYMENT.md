@@ -14,6 +14,10 @@ The browser preview has no external runtime dependency and uses synthetic data.
 
 `index.html` and `web/` can be served from any static host. GitHub Pages or similar free tiers can host the P0 demo. Do not place live Maximo credentials or RTA operational data in a public static deployment.
 
+## Vercel
+
+The repository is linked to a Vercel project. Vercel's Node.js preset uses `server.mjs` as the root entrypoint and invokes its default export as a `(req, res)` handler; `server.mjs` exports such a handler that dispatches into the same `http.Server` used locally, evaluates without top-level `await`, and skips its own `listen()` when the `VERCEL` environment variable is set. `vercel.json` sets the build command to `npm run typecheck` on purpose: the Node.js preset runs the package `build` script otherwise, then treats any `dist/index.js` it finds as the server, and that file is the compiled library barrel, not the server. With no emitted `dist/`, the builder bundles `server.mjs` and its TypeScript imports itself. `includeFiles` ships `index.html` and `web/**` next to the bundle for the static routes. Pushes to `main` deploy production; pull-request branches get preview deployments. Preview deployments are protected by Vercel authentication by default. Set the same variables as `.env.example` in the Vercel project when needed; without them the deployment runs the synthetic demo with in-memory adapters, which is the only mode suitable for a public URL.
+
 ## Local open-source brain
 
 Run an OpenAI-compatible local inference endpoint using an open-source runtime such as llama.cpp or vLLM. Set `LLM_BASE_URL` and `LLM_MODEL`. The RailMind domain layer does not import a proprietary model SDK.
